@@ -1,0 +1,32 @@
+---
+version: "3.7"
+services:
+  fdwdb:
+    image: library/postgres:9.6
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: passw0rd
+      POSTGRES_USER: fdw
+      POSTGRES_DB: fdw
+    depends_on:
+      - remotedb1
+    networks:
+      - fdwctl_net
+  remotedb1:
+    image: library/postgres:9.6
+    ports:
+      - 15432:5432
+    environment:
+      POSTGRES_PASSWORD: r3m0TE!
+      POSTGRES_USER: remoteuser
+      POSTGRES_DB: remotedb
+    networks:
+      - fdwctl_net
+networks:
+  fdwctl_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.10.0.0/16
