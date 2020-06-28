@@ -9,34 +9,34 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"os"
-	"strings"
 )
 
 var (
 	listCmd = &cobra.Command{
-		Use:       "list <objectType>",
-		Short:     "List objects",
-		PreRunE:   preDoList,
-		PostRunE:  postDoList,
-		Run:       doList,
-		Args:      cobra.MinimumNArgs(1),
-		ValidArgs: []string{"server", "extension"},
+		Use:               "list <object type>",
+		Short:             "List objects",
+		PersistentPreRunE: preDoList,
+		PersistentPostRun: postDoList,
+	}
+	listServerCmd = &cobra.Command{
+		Use:   "server",
+		Short: "List foreign server objects",
+		Run:   listServers,
+	}
+	listExtensionCmd = &cobra.Command{
+		Use:   "extension",
+		Short: "List extensions",
+		Run:   listExtension,
 	}
 	dbConnection *pgx.Conn
 )
 
-type ForeignServersResult struct {
-	ServerName  string `db:"foreign_server_name"`
-	WrapperName string `db:"foreign_data_wrapper_name"`
-	Owner       string `db:"authorization_identifier"`
+func init() {
+	listCmd.AddCommand(listServerCmd)
+	listCmd.AddCommand(listExtensionCmd)
 }
 
-type ExtensionsResult struct {
-	Name    string `db:"extname"`
-	Version string `db:"extversion"`
-}
-
-func preDoList(cmd *cobra.Command, args []string) error {
+func preDoList(cmd *cobra.Command, _ []string) error {
 	var err error
 	log := logger.
 		Root().
@@ -44,9 +44,6 @@ func preDoList(cmd *cobra.Command, args []string) error {
 		WithField("function", "preDoList")
 	if connectionString == "" {
 		return errors.New("fdw database connection string is required")
-	}
-	if len(args) == 0 {
-		return errors.New("object type is required")
 	}
 	dbConnection, err = database.GetConnection(cmd.Context(), connectionString)
 	if err != nil {
@@ -56,34 +53,24 @@ func preDoList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func postDoList(cmd *cobra.Command, _ []string) error {
+func postDoList(cmd *cobra.Command, _ []string) {
 	database.CloseConnection(cmd.Context(), dbConnection)
-	return nil
 }
 
-func doList(cmd *cobra.Command, args []string) {
-	log := logger.Root().WithField("function", "doList")
-	objectType := strings.TrimSpace(args[0])
-	switch objectType {
-	case "server":
-		listServers(cmd)
-	case "extension":
-		listExtension(cmd)
-	default:
-		log.Errorf("unknown object type: %s", objectType)
-	}
-}
-
-func listServers(cmd *cobra.Command) {
+func listServers(cmd *cobra.Command, _ []string) {
 	var err error
 	log := logger.
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "listServers")
-	query, _, _ := sqrl.
+	query, _, err := sqrl.
 		Select("foreign_server_name, foreign_data_wrapper_name, authorization_identifier").
 		From("information_schema.foreign_servers").
 		ToSql()
+	if err != nil {
+		log.Errorf("error creating query: %s", err)
+		return
+	}
 	rows, err := dbConnection.Query(cmd.Context(), query)
 	if err != nil {
 		log.Errorf("error querying for servers: %s", err)
@@ -92,31 +79,31 @@ func listServers(cmd *cobra.Command) {
 	defer rows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Wrapper", "Owner"})
+	var serverName, wrapperName, owner string
 	for rows.Next() {
-		fserver := new(ForeignServersResult)
-		err = rows.Scan(&fserver.ServerName, &fserver.WrapperName, &fserver.Owner)
+		err = rows.Scan(&serverName, &wrapperName, &owner)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
-		table.Append([]string{
-			fserver.ServerName,
-			fserver.WrapperName,
-			fserver.Owner,
-		})
+		table.Append([]string{serverName, wrapperName, owner})
 	}
 	table.Render()
 }
 
-func listExtension(cmd *cobra.Command) {
+func listExtension(cmd *cobra.Command, _ []string) {
 	log := logger.
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "listExtension")
-	query, _, _ := sqrl.
+	query, _, err := sqrl.
 		Select("extname", "extversion").
 		From("pg_extension").
 		ToSql()
+	if err != nil {
+		log.Errorf("error creating query: %s", err)
+		return
+	}
 	rows, err := dbConnection.Query(cmd.Context(), query)
 	if err != nil {
 		log.Errorf("error querying for extensions: %s", err)
@@ -125,16 +112,16 @@ func listExtension(cmd *cobra.Command) {
 	defer rows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Version"})
+	var extname, extversion string
 	for rows.Next() {
-		ext := new(ExtensionsResult)
-		err = rows.Scan(&ext.Name, &ext.Version)
+		err = rows.Scan(&extname, &extversion)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			return
 		}
 		table.Append([]string{
-			ext.Name,
-			ext.Version,
+			extname,
+			extversion,
 		})
 	}
 	table.Render()

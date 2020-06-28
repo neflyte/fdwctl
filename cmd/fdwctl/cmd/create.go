@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -11,13 +10,20 @@ import (
 
 var (
 	createCmd = &cobra.Command{
-		Use:       "create <objectType>",
-		Short:     "Create objects",
-		PreRunE:   preDoCreate,
-		PostRunE:  postDoCreate,
-		Run:       doCreate,
-		Args:      cobra.MinimumNArgs(1),
-		ValidArgs: []string{"server", "extension"},
+		Use:               "create <objectType>",
+		Short:             "Create objects",
+		PersistentPreRunE: preDoCreate,
+		PersistentPostRun: postDoCreate,
+	}
+	createServerCmd = &cobra.Command{
+		Use:   "server",
+		Short: "Create a server object",
+		Run:   createServer,
+	}
+	createExtensionCmd = &cobra.Command{
+		Use:   "extension",
+		Short: "Create the postgres_fdw extension",
+		Run:   createExtension,
 	}
 	serverHost   string
 	serverPort   string
@@ -25,23 +31,22 @@ var (
 )
 
 func init() {
-	createCmd.Flags().StringVar(&serverHost, "serverhost", "", "hostname of the remote PG server")
-	createCmd.Flags().StringVar(&serverPort, "serverport", "5432", "port of the remote PG server")
-	createCmd.Flags().StringVar(&serverDBName, "serverdbname", "", "database name on remote PG server")
+	createServerCmd.Flags().StringVar(&serverHost, "serverhost", "", "hostname of the remote PG server")
+	createServerCmd.Flags().StringVar(&serverPort, "serverport", "5432", "port of the remote PG server")
+	createServerCmd.Flags().StringVar(&serverDBName, "serverdbname", "", "database name on remote PG server")
+	_ = createServerCmd.MarkFlagRequired("serverhost")
+	_ = createServerCmd.MarkFlagRequired("serverport")
+	_ = createServerCmd.MarkFlagRequired("serverdbname")
+	createCmd.AddCommand(createServerCmd)
+	createCmd.AddCommand(createExtensionCmd)
 }
 
-func preDoCreate(cmd *cobra.Command, args []string) error {
+func preDoCreate(cmd *cobra.Command, _ []string) error {
 	var err error
 	log := logger.
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "preDoCreate")
-	if connectionString == "" {
-		return errors.New("fdw database connection string is required")
-	}
-	if len(args) == 0 {
-		return errors.New("object type is required")
-	}
 	dbConnection, err = database.GetConnection(cmd.Context(), connectionString)
 	if err != nil {
 		log.Errorf("error getting database connection: %s", err)
@@ -50,25 +55,11 @@ func preDoCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func postDoCreate(cmd *cobra.Command, _ []string) error {
+func postDoCreate(cmd *cobra.Command, _ []string) {
 	database.CloseConnection(cmd.Context(), dbConnection)
-	return nil
 }
 
-func doCreate(cmd *cobra.Command, args []string) {
-	log := logger.Root().WithField("function", "doCreate")
-	objectType := strings.TrimSpace(args[0])
-	switch objectType {
-	case "server":
-		createServer(cmd)
-	case "extension":
-		createExtension(cmd)
-	default:
-		log.Errorf("unknown object type: %s", objectType)
-	}
-}
-
-func createExtension(cmd *cobra.Command) {
+func createExtension(cmd *cobra.Command, _ []string) {
 	log := logger.Root().WithField("function", "createExtension")
 	query := "CREATE EXTENSION IF NOT EXISTS postgres_fdw"
 	_, err := dbConnection.Exec(cmd.Context(), query)
@@ -79,20 +70,8 @@ func createExtension(cmd *cobra.Command) {
 	log.Info("extension postgres_fdw created")
 }
 
-func createServer(cmd *cobra.Command) {
-	log := logger.Root().WithField("function", "createExtension")
-	if serverHost == "" {
-		log.Errorf("server hostname is required")
-		return
-	}
-	if serverPort == "" {
-		log.Errorf("server port is required")
-		return
-	}
-	if serverDBName == "" {
-		log.Errorf("database name is required")
-		return
-	}
+func createServer(cmd *cobra.Command, _ []string) {
+	log := logger.Root().WithField("function", "createServer")
 	hostSlug := strings.Replace(serverHost, ".", "-", -1)
 	serverName := fmt.Sprintf("%s_%s_%s", hostSlug, serverPort, serverDBName)
 	query := fmt.Sprintf(
