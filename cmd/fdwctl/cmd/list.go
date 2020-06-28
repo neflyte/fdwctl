@@ -14,11 +14,13 @@ import (
 
 var (
 	listCmd = &cobra.Command{
-		Use:      "list <objectType>",
-		Short:    "List objects [server, extension]",
-		PreRunE:  preDoList,
-		PostRunE: postDoList,
-		Run:      doList,
+		Use:       "list <objectType>",
+		Short:     "List objects",
+		PreRunE:   preDoList,
+		PostRunE:  postDoList,
+		Run:       doList,
+		Args:      cobra.MinimumNArgs(1),
+		ValidArgs: []string{"server", "extension"},
 	}
 	dbConnection *pgx.Conn
 )
@@ -40,6 +42,9 @@ func preDoList(cmd *cobra.Command, args []string) error {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "preDoList")
+	if connectionString == "" {
+		return errors.New("fdw database connection string is required")
+	}
 	if len(args) == 0 {
 		return errors.New("object type is required")
 	}

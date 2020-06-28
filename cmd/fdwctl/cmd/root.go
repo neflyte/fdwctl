@@ -7,12 +7,11 @@ import (
 
 var (
 	rootCmd = &cobra.Command{
-		Use:     "fdwcli",
-		Short:   "A management CLI for PostgreSQL postgres_fdw",
-		PreRunE: preDo,
+		Use:   "fdwctl",
+		Short: "A management CLI for PostgreSQL postgres_fdw",
 	}
-	connectionString = ""
-	logFormat        = ""
+	connectionString string
+	logFormat        string
 )
 
 func Execute() error {
@@ -22,15 +21,11 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initCommand)
 	rootCmd.PersistentFlags().StringVar(&logFormat, "logformat", "text", "log output format")
-	rootCmd.PersistentFlags().StringVarP(&connectionString, "connection", "c", "", "database connection string")
-	// Add commands here
+	rootCmd.PersistentFlags().StringVarP(&connectionString, "connection", "c", "", "database connection string (required)")
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(createCmd)
 }
 
 func initCommand() {
 	logger.SetFormat(logFormat)
-}
-
-func preDo(cmd *cobra.Command, args []string) error {
-	return nil
 }
