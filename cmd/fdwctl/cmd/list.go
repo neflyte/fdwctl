@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/database"
@@ -10,6 +9,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"os"
+	"strings"
 )
 
 var (
@@ -29,6 +29,11 @@ var (
 		Short: "List extensions",
 		Run:   listExtension,
 	}
+	listUsermapCmd = &cobra.Command{
+		Use:   "usermap [server name]",
+		Short: "List user mappings",
+		Run:   listUsermap,
+	}
 	dbConnection *pgx.Conn
 )
 
@@ -41,6 +46,7 @@ type ServerObject struct {
 func init() {
 	listCmd.AddCommand(listServerCmd)
 	listCmd.AddCommand(listExtensionCmd)
+	listCmd.AddCommand(listUsermapCmd)
 }
 
 func preDoList(cmd *cobra.Command, _ []string) error {
@@ -102,10 +108,22 @@ func listServers(cmd *cobra.Command, _ []string) {
 		})
 	}
 	rows.Close()
+	var optionsRows pgx.Rows
+	var optionsQuery string
+	var optionsArgs []interface{}
 	for _, server := range servers {
-		optionsQuery := fmt.Sprintf("SELECT option_name, option_value FROM information_schema.foreign_server_options WHERE foreign_server_name = '%s'", server.Name)
-		log.Tracef("query: %s", optionsQuery)
-		optionsRows, err := dbConnection.Query(cmd.Context(), optionsQuery)
+		optionsQuery, optionsArgs, err = sqrl.
+			Select("option_name", "option_value").
+			From("information_schema.foreign_server_options").
+			Where(sqrl.Eq{"foreign_server_name": server.Name}).
+			PlaceholderFormat(sqrl.Dollar).
+			ToSql()
+		if err != nil {
+			log.Errorf("error creating query: %s", err)
+			continue
+		}
+		log.Tracef("query: %s, args: %#v", optionsQuery, optionsArgs)
+		optionsRows, err = dbConnection.Query(cmd.Context(), optionsQuery, optionsArgs...)
 		if err != nil {
 			log.Errorf("error querying server options: %s", err)
 			continue
@@ -166,6 +184,86 @@ func listExtension(cmd *cobra.Command, _ []string) {
 			extname,
 			extversion,
 		})
+	}
+	table.Render()
+}
+
+func listUsermap(cmd *cobra.Command, args []string) {
+	log := logger.
+		Root().
+		WithContext(cmd.Context()).
+		WithField("function", "listUsermap")
+	serverName := ""
+	if len(args) > 0 {
+		serverName = strings.TrimSpace(args[0])
+	}
+	sb := sqrl.Select("authorization_identifier").
+		From("information_schema.user_mappings")
+	if serverName != "" {
+		sb = sb.Where(sqrl.Eq{"foreign_server_name": serverName})
+	}
+	query, _, err := sb.PlaceholderFormat(sqrl.Dollar).ToSql()
+	if err != nil {
+		log.Errorf("error creating query: %s", err)
+		return
+	}
+	log.Tracef("query: %s", query)
+	mappingRows, err := dbConnection.Query(cmd.Context(), query)
+	if err != nil {
+		log.Errorf("error selecting user mappings: %s", err)
+		return
+	}
+	defer mappingRows.Close()
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Local User", "Remote User", "Remote Password"})
+	users := make([]string, 0)
+	var user string
+	for mappingRows.Next() {
+		err = mappingRows.Scan(&user)
+		if err != nil {
+			log.Errorf("error scanning result row: %s", err)
+			continue
+		}
+		users = append(users, user)
+	}
+	var optQuery string
+	var optArgs []interface{}
+	var optRows pgx.Rows
+	for _, user = range users {
+		optQuery, optArgs, err = sqrl.
+			Select("option_name", "option_value").
+			From("information_schema.user_mapping_options").
+			Where(sqrl.Eq{"authorization_identifier": user}).
+			PlaceholderFormat(sqrl.Dollar).
+			ToSql()
+		if err != nil {
+			log.Errorf("error creating query: %s", err)
+			continue
+		}
+		log.Tracef("query: %s, args: %#v", optQuery, optArgs)
+		optRows, err = dbConnection.Query(cmd.Context(), optQuery, optArgs...)
+		if err != nil {
+			log.Errorf("error querying user options: %s", err)
+			continue
+		}
+		var optName, optValue, optUser, optPass string
+		for optRows.Next() {
+			err = optRows.Scan(&optName, &optValue)
+			if err != nil {
+				log.Errorf("error scanning result row: %s", err)
+				continue
+			}
+			switch optName {
+			case "user":
+				optUser = optValue
+			case "password":
+				optPass = optValue
+			default:
+				log.Debugf("unknown option: %s", optName)
+			}
+		}
+		optRows.Close()
+		table.Append([]string{user, optUser, optPass})
 	}
 	table.Render()
 }
