@@ -25,9 +25,18 @@ var (
 		Short: "Create the postgres_fdw extension",
 		Run:   createExtension,
 	}
-	serverHost   string
-	serverPort   string
-	serverDBName string
+	createUsermapCmd = &cobra.Command{
+		Use:   "usermap",
+		Short: "Create a user mapping",
+		Run:   createUsermap,
+	}
+	serverHost     string
+	serverPort     string
+	serverDBName   string
+	localUser      string
+	remoteUser     string
+	remotePassword string
+	serverName     string
 )
 
 func init() {
@@ -37,8 +46,19 @@ func init() {
 	_ = createServerCmd.MarkFlagRequired("serverhost")
 	_ = createServerCmd.MarkFlagRequired("serverport")
 	_ = createServerCmd.MarkFlagRequired("serverdbname")
+
+	createUsermapCmd.Flags().StringVar(&serverName, "servername", "", "foreign server name")
+	createUsermapCmd.Flags().StringVar(&localUser, "localuser", "", "local user name")
+	createUsermapCmd.Flags().StringVar(&remoteUser, "remoteuser", "", "remote user name")
+	createUsermapCmd.Flags().StringVar(&remotePassword, "remotepassword", "", "remote user password")
+	_ = createUsermapCmd.MarkFlagRequired("servername")
+	_ = createUsermapCmd.MarkFlagRequired("localuser")
+	_ = createUsermapCmd.MarkFlagRequired("remoteuser")
+	_ = createUsermapCmd.MarkFlagRequired("remotepassword")
+
 	createCmd.AddCommand(createServerCmd)
 	createCmd.AddCommand(createExtensionCmd)
+	createCmd.AddCommand(createUsermapCmd)
 }
 
 func preDoCreate(cmd *cobra.Command, _ []string) error {
@@ -60,7 +80,9 @@ func postDoCreate(cmd *cobra.Command, _ []string) {
 }
 
 func createExtension(cmd *cobra.Command, _ []string) {
-	log := logger.Root().WithField("function", "createExtension")
+	log := logger.Root().
+		WithContext(cmd.Context()).
+		WithField("function", "createExtension")
 	query := "CREATE EXTENSION IF NOT EXISTS postgres_fdw"
 	_, err := dbConnection.Exec(cmd.Context(), query)
 	if err != nil {
@@ -71,12 +93,14 @@ func createExtension(cmd *cobra.Command, _ []string) {
 }
 
 func createServer(cmd *cobra.Command, _ []string) {
-	log := logger.Root().WithField("function", "createServer")
+	log := logger.Root().
+		WithContext(cmd.Context()).
+		WithField("function", "createServer")
 	hostSlug := strings.Replace(serverHost, ".", "-", -1)
-	serverName := fmt.Sprintf("%s_%s_%s", hostSlug, serverPort, serverDBName)
+	serverSlug := fmt.Sprintf("%s_%s_%s", hostSlug, serverPort, serverDBName)
 	query := fmt.Sprintf(
 		"CREATE SERVER %s FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%s', dbname '%s')",
-		serverName,
+		serverSlug,
 		serverHost,
 		serverPort,
 		serverDBName,
@@ -87,4 +111,19 @@ func createServer(cmd *cobra.Command, _ []string) {
 		return
 	}
 	log.Infof("server %s created", serverName)
+}
+
+func createUsermap(cmd *cobra.Command, _ []string) {
+	log := logger.Root().
+		WithContext(cmd.Context()).
+		WithField("function", "createUsermap")
+	// FIXME: check if localUser exists and create if it doesn't
+	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", localUser, serverName, remoteUser, remotePassword)
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.Exec(cmd.Context(), query)
+	if err != nil {
+		log.Errorf("error creating user mapping: %s", err)
+		return
+	}
+	log.Infof("user mapping %s -> %s created", localUser, remoteUser)
 }
