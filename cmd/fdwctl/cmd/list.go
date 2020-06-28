@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/database"
@@ -30,6 +31,12 @@ var (
 	}
 	dbConnection *pgx.Conn
 )
+
+type ServerObject struct {
+	Name    string
+	Wrapper string
+	Owner   string
+}
 
 func init() {
 	listCmd.AddCommand(listServerCmd)
@@ -71,6 +78,7 @@ func listServers(cmd *cobra.Command, _ []string) {
 		log.Errorf("error creating query: %s", err)
 		return
 	}
+	log.Tracef("query: %s", query)
 	rows, err := dbConnection.Query(cmd.Context(), query)
 	if err != nil {
 		log.Errorf("error querying for servers: %s", err)
@@ -78,7 +86,8 @@ func listServers(cmd *cobra.Command, _ []string) {
 	}
 	defer rows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Name", "Wrapper", "Owner"})
+	table.SetHeader([]string{"Name", "Wrapper", "Owner", "Hostname", "Port", "DB Name"})
+	servers := make([]ServerObject, 0)
 	var serverName, wrapperName, owner string
 	for rows.Next() {
 		err = rows.Scan(&serverName, &wrapperName, &owner)
@@ -86,7 +95,41 @@ func listServers(cmd *cobra.Command, _ []string) {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
-		table.Append([]string{serverName, wrapperName, owner})
+		servers = append(servers, ServerObject{
+			Name:    serverName,
+			Wrapper: wrapperName,
+			Owner:   owner,
+		})
+	}
+	rows.Close()
+	for _, server := range servers {
+		optionsQuery := fmt.Sprintf("SELECT option_name, option_value FROM information_schema.foreign_server_options WHERE foreign_server_name = '%s'", server.Name)
+		log.Tracef("query: %s", optionsQuery)
+		optionsRows, err := dbConnection.Query(cmd.Context(), optionsQuery)
+		if err != nil {
+			log.Errorf("error querying server options: %s", err)
+			continue
+		}
+		var optionName, optionValue, hostName, port, dbName string
+		for optionsRows.Next() {
+			err = optionsRows.Scan(&optionName, &optionValue)
+			if err != nil {
+				log.Errorf("error scanning result row: %s", err)
+				continue
+			}
+			switch optionName {
+			case "host":
+				hostName = optionValue
+			case "port":
+				port = optionValue
+			case "dbname":
+				dbName = optionValue
+			default:
+				log.Tracef("unknown option: %s", optionName)
+			}
+		}
+		table.Append([]string{server.Name, server.Wrapper, server.Owner, hostName, port, dbName})
+		optionsRows.Close()
 	}
 	table.Render()
 }
