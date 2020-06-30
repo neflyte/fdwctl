@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/cobra"
 	"strings"
 )
@@ -105,22 +106,27 @@ func createServer(cmd *cobra.Command, _ []string) {
 		serverPort,
 		serverDBName,
 	)
+	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(cmd.Context(), query)
 	if err != nil {
 		log.Errorf("error creating server: %s", err)
 		return
 	}
-	log.Infof("server %s created", serverName)
+	log.Infof("server %s created", serverSlug)
 }
 
 func createUsermap(cmd *cobra.Command, _ []string) {
 	log := logger.Root().
 		WithContext(cmd.Context()).
 		WithField("function", "createUsermap")
-	// FIXME: check if localUser exists and create if it doesn't
+	err := util.EnsureUser(cmd.Context(), dbConnection, localUser, remotePassword)
+	if err != nil {
+		log.Errorf("error ensuring local user exists: %s", err)
+		return
+	}
 	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", localUser, serverName, remoteUser, remotePassword)
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(cmd.Context(), query)
+	_, err = dbConnection.Exec(cmd.Context(), query)
 	if err != nil {
 		log.Errorf("error creating user mapping: %s", err)
 		return

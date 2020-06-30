@@ -93,6 +93,7 @@ func listServers(cmd *cobra.Command, _ []string) {
 	defer rows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Wrapper", "Owner", "Hostname", "Port", "DB Name"})
+	// FIXME: Do this in one SQL statement instead of many
 	servers := make([]ServerObject, 0)
 	var serverName, wrapperName, owner string
 	for rows.Next() {
@@ -189,81 +190,46 @@ func listExtension(cmd *cobra.Command, _ []string) {
 }
 
 func listUsermap(cmd *cobra.Command, args []string) {
+	var err error
 	log := logger.
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "listUsermap")
-	serverName := ""
+	foreignServer := ""
 	if len(args) > 0 {
-		serverName = strings.TrimSpace(args[0])
+		foreignServer = strings.TrimSpace(args[0])
 	}
-	sb := sqrl.Select("authorization_identifier").
-		From("information_schema.user_mappings")
-	if serverName != "" {
-		sb = sb.Where(sqrl.Eq{"foreign_server_name": serverName})
+	sb := sqrl.
+		Select("u.authorization_identifier", "ou.option_value", "op.option_value", "s.srvname").
+		From("information_schema.user_mappings u").
+		Join("information_schema.user_mapping_options ou ON ou.authorization_identifier = u.authorization_identifier AND ou.option_name = 'user'").
+		Join("information_schema.user_mapping_options op ON op.authorization_identifier = u.authorization_identifier AND op.option_name = 'password'").
+		Join("pg_user_mappings s ON s.usename = u.authorization_identifier")
+	if foreignServer != "" {
+		sb = sb.Where(sqrl.Eq{"s.srvname": foreignServer})
 	}
-	query, _, err := sb.PlaceholderFormat(sqrl.Dollar).ToSql()
+	query, qArgs, err := sb.PlaceholderFormat(sqrl.Dollar).ToSql()
 	if err != nil {
 		log.Errorf("error creating query: %s", err)
 		return
 	}
-	log.Tracef("query: %s", query)
-	mappingRows, err := dbConnection.Query(cmd.Context(), query)
+	log.Tracef("query: %s, args: %#v", query, qArgs)
+	mappingRows, err := dbConnection.Query(cmd.Context(), query, qArgs...)
 	if err != nil {
 		log.Errorf("error selecting user mappings: %s", err)
 		return
 	}
 	defer mappingRows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Local User", "Remote User", "Remote Password"})
-	users := make([]string, 0)
-	var user string
+	table.SetHeader([]string{"Local User", "Remote User", "Remote Password", "Remote Server"})
+	var user, optUser, optPass, srvName string
 	for mappingRows.Next() {
-		err = mappingRows.Scan(&user)
+		err = mappingRows.Scan(&user, &optUser, &optPass, &srvName)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
-		users = append(users, user)
-	}
-	var optQuery string
-	var optArgs []interface{}
-	var optRows pgx.Rows
-	for _, user = range users {
-		optQuery, optArgs, err = sqrl.
-			Select("option_name", "option_value").
-			From("information_schema.user_mapping_options").
-			Where(sqrl.Eq{"authorization_identifier": user}).
-			PlaceholderFormat(sqrl.Dollar).
-			ToSql()
-		if err != nil {
-			log.Errorf("error creating query: %s", err)
-			continue
-		}
-		log.Tracef("query: %s, args: %#v", optQuery, optArgs)
-		optRows, err = dbConnection.Query(cmd.Context(), optQuery, optArgs...)
-		if err != nil {
-			log.Errorf("error querying user options: %s", err)
-			continue
-		}
-		var optName, optValue, optUser, optPass string
-		for optRows.Next() {
-			err = optRows.Scan(&optName, &optValue)
-			if err != nil {
-				log.Errorf("error scanning result row: %s", err)
-				continue
-			}
-			switch optName {
-			case "user":
-				optUser = optValue
-			case "password":
-				optPass = optValue
-			default:
-				log.Debugf("unknown option: %s", optName)
-			}
-		}
-		optRows.Close()
-		table.Append([]string{user, optUser, optPass})
+		table.Append([]string{user, optUser, optPass, srvName})
 	}
 	table.Render()
 }
