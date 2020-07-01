@@ -34,6 +34,11 @@ var (
 		Short: "List user mappings",
 		Run:   listUsermap,
 	}
+	listSchemaCmd = &cobra.Command{
+		Use:   "schema",
+		Short: "List schemas that contain foreign tables",
+		Run:   listSchema,
+	}
 	dbConnection *pgx.Conn
 )
 
@@ -41,6 +46,7 @@ func init() {
 	listCmd.AddCommand(listServerCmd)
 	listCmd.AddCommand(listExtensionCmd)
 	listCmd.AddCommand(listUsermapCmd)
+	listCmd.AddCommand(listSchemaCmd)
 }
 
 func preDoList(cmd *cobra.Command, _ []string) error {
@@ -183,6 +189,33 @@ func listUsermap(cmd *cobra.Command, args []string) {
 			continue
 		}
 		table.Append([]string{user, optUser, optPass, srvName})
+	}
+	table.Render()
+}
+
+func listSchema(cmd *cobra.Command, _ []string) {
+	log := logger.
+		Root().
+		WithContext(cmd.Context()).
+		WithField("function", "listSchema")
+	query := "SELECT DISTINCT foreign_table_schema FROM information_schema.foreign_tables"
+	log.Tracef("query: %s", query)
+	schemaRows, err := dbConnection.Query(cmd.Context(), query)
+	if err != nil {
+		log.Errorf("error listing schemas: %s", err)
+		return
+	}
+	defer schemaRows.Close()
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Schema Name"})
+	var schemaName string
+	for schemaRows.Next() {
+		err = schemaRows.Scan(&schemaName)
+		if err != nil {
+			log.Errorf("error scanning result row: %s", err)
+			continue
+		}
+		table.Append([]string{schemaName})
 	}
 	table.Render()
 }

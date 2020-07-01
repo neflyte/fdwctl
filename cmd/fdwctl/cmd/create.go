@@ -32,13 +32,21 @@ var (
 		Short: "Create a user mapping for a foreign server",
 		Run:   createUsermap,
 	}
-	serverHost     string
-	serverPort     string
-	serverDBName   string
-	localUser      string
-	remoteUser     string
-	remotePassword string
-	serverName     string
+	createSchemaCmd = &cobra.Command{
+		Use:   "schema <local schema name>",
+		Short: "Create (import) a schema from a foreign server",
+		Run:   createSchema,
+	}
+	serverHost       string
+	serverPort       string
+	serverDBName     string
+	localUser        string
+	remoteUser       string
+	remotePassword   string
+	serverName       string
+	localSchemaName  string
+	remoteSchemaName string
+	csServerName     string
 )
 
 func init() {
@@ -58,9 +66,17 @@ func init() {
 	_ = createUsermapCmd.MarkFlagRequired("remoteuser")
 	_ = createUsermapCmd.MarkFlagRequired("remotepassword")
 
+	createSchemaCmd.Flags().StringVar(&localSchemaName, "localschema", "", "local schema name")
+	createSchemaCmd.Flags().StringVar(&csServerName, "servername", "", "foreign server name")
+	createSchemaCmd.Flags().StringVar(&remoteSchemaName, "remoteschema", "", "the remote schema to import")
+	_ = createSchemaCmd.MarkFlagRequired("localschema")
+	_ = createSchemaCmd.MarkFlagRequired("servername")
+	_ = createSchemaCmd.MarkFlagRequired("remoteschema")
+
 	createCmd.AddCommand(createServerCmd)
 	createCmd.AddCommand(createExtensionCmd)
 	createCmd.AddCommand(createUsermapCmd)
+	createCmd.AddCommand(createSchemaCmd)
 }
 
 func preDoCreate(cmd *cobra.Command, _ []string) error {
@@ -133,4 +149,23 @@ func createUsermap(cmd *cobra.Command, _ []string) {
 		return
 	}
 	log.Infof("user mapping %s -> %s created", localUser, remoteUser)
+}
+
+func createSchema(cmd *cobra.Command, _ []string) {
+	log := logger.Root().
+		WithContext(cmd.Context()).
+		WithField("function", "createSchema")
+	err := util.EnsureSchema(cmd.Context(), dbConnection, localSchemaName)
+	if err != nil {
+		log.Errorf("error ensuring local schema exists: %s", err)
+		return
+	}
+	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", remoteSchemaName, csServerName, localSchemaName)
+	log.Tracef("query: %s", query)
+	_, err = dbConnection.Exec(cmd.Context(), query)
+	if err != nil {
+		log.Errorf("error importing foreign schema: %s", err)
+		return
+	}
+	log.Infof("foreign schema %s imported", remoteSchemaName)
 }

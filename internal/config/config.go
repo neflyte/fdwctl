@@ -32,7 +32,7 @@ func Instance() *AppConfig {
 
 func Load(ac *AppConfig) error {
 	log := logger.Root().
-		WithField("function", "Load")
+		WithField("function", "Load1w")
 	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
 	if xdgConfigHome == "" {
 		homedir, err := os.UserHomeDir()
@@ -41,6 +41,8 @@ func Load(ac *AppConfig) error {
 		}
 		if homedir != "" {
 			xdgConfigHome = path.Join(homedir, ".config")
+		} else {
+			xdgConfigHome = "."
 		}
 	}
 	cfgFullPath := path.Join(xdgConfigHome, XDGAppConfigDir, FileName)
