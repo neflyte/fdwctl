@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"errors"
 	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"os"
 	"strings"
 )
@@ -55,10 +55,7 @@ func preDoList(cmd *cobra.Command, _ []string) error {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "preDoList")
-	if connectionString == "" {
-		return errors.New("fdw database connection string is required")
-	}
-	dbConnection, err = database.GetConnection(cmd.Context(), connectionString)
+	dbConnection, err = database.GetConnection(cmd.Context(), viper.GetString("FDWConnection"))
 	if err != nil {
 		log.Errorf("error getting database connection: %s", err)
 		return err
