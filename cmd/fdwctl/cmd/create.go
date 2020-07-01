@@ -12,14 +12,14 @@ import (
 
 var (
 	createCmd = &cobra.Command{
-		Use:               "create <objectType>",
+		Use:               "create <object type>",
 		Short:             "Create objects",
 		PersistentPreRunE: preDoCreate,
 		PersistentPostRun: postDoCreate,
 	}
 	createServerCmd = &cobra.Command{
 		Use:   "server",
-		Short: "Create a server object",
+		Short: "Create a foreign server",
 		Run:   createServer,
 	}
 	createExtensionCmd = &cobra.Command{
@@ -29,7 +29,7 @@ var (
 	}
 	createUsermapCmd = &cobra.Command{
 		Use:   "usermap",
-		Short: "Create a user mapping",
+		Short: "Create a user mapping for a foreign server",
 		Run:   createUsermap,
 	}
 	serverHost     string

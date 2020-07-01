@@ -21,7 +21,7 @@ var (
 	}
 	listServerCmd = &cobra.Command{
 		Use:   "server",
-		Short: "List foreign server objects",
+		Short: "List foreign servers",
 		Run:   listServers,
 	}
 	listExtensionCmd = &cobra.Command{

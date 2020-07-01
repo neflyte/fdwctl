@@ -18,18 +18,18 @@ var (
 	}
 	dropExtensionCmd = &cobra.Command{
 		Use:   "extension",
-		Short: "drop the postgres_fdw extension",
+		Short: "Drop the postgres_fdw extension",
 		Run:   dropExtension,
 	}
 	dropServerCmd = &cobra.Command{
 		Use:   "server <server name>",
-		Short: "drop a foreign server",
+		Short: "Drop a foreign server",
 		Run:   dropServer,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	dropUsermapCmd = &cobra.Command{
 		Use:   "usermap <server name> <local user>",
-		Short: "drop a user mapping for a foreign server",
+		Short: "Drop a user mapping for a foreign server",
 		Run:   dropUsermap,
 		Args:  cobra.MinimumNArgs(2),
 	}
