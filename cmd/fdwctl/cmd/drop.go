@@ -33,6 +33,12 @@ var (
 		Run:   dropUsermap,
 		Args:  cobra.MinimumNArgs(2),
 	}
+	dropSchemaCmd = &cobra.Command{
+		Use:   "schema <schema name>",
+		Short: "Drop a schema",
+		Run:   dropSchema,
+		Args:  cobra.MinimumNArgs(1),
+	}
 	cascadeDrop   bool
 	dropLocalUser bool
 )
@@ -43,6 +49,7 @@ func init() {
 	dropCmd.AddCommand(dropExtensionCmd)
 	dropCmd.AddCommand(dropServerCmd)
 	dropCmd.AddCommand(dropUsermapCmd)
+	dropCmd.AddCommand(dropSchemaCmd)
 }
 
 func preDoDrop(cmd *cobra.Command, _ []string) error {
@@ -83,12 +90,12 @@ func dropServer(cmd *cobra.Command, args []string) {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "dropServer")
-	serverName := strings.TrimSpace(args[0])
-	if serverName == "" {
+	dsServerName := strings.TrimSpace(args[0])
+	if dsServerName == "" {
 		log.Errorf("server name is required")
 		return
 	}
-	query := fmt.Sprintf("DROP SERVER %s", serverName)
+	query := fmt.Sprintf("DROP SERVER %s", dsServerName)
 	if cascadeDrop {
 		query = fmt.Sprintf("%s CASCADE", query)
 	}
@@ -98,7 +105,7 @@ func dropServer(cmd *cobra.Command, args []string) {
 		log.Errorf("error dropping server: %s", err)
 		return
 	}
-	log.Infof("server %s dropped", serverName)
+	log.Infof("server %s dropped", dsServerName)
 }
 
 func dropUsermap(cmd *cobra.Command, args []string) {
@@ -134,4 +141,27 @@ func dropUsermap(cmd *cobra.Command, args []string) {
 		}
 		log.Infof("user %s dropped", duLocalUser)
 	}
+}
+
+func dropSchema(cmd *cobra.Command, args []string) {
+	log := logger.
+		Root().
+		WithContext(cmd.Context()).
+		WithField("function", "dropSchema")
+	dsSchemaName := strings.TrimSpace(args[0])
+	if dsSchemaName == "" {
+		log.Errorf("schema name is required")
+		return
+	}
+	query := fmt.Sprintf("DROP SCHEMA %s", dsSchemaName)
+	if cascadeDrop {
+		query = fmt.Sprintf("%s CASCADE", query)
+	}
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.Exec(cmd.Context(), query)
+	if err != nil {
+		log.Errorf("error dropping schema: %s", err)
+		return
+	}
+	log.Infof("schema %s dropped", dsSchemaName)
 }

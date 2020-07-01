@@ -160,6 +160,7 @@ func createSchema(cmd *cobra.Command, _ []string) {
 		log.Errorf("error ensuring local schema exists: %s", err)
 		return
 	}
+	// TODO: support LIMIT TO and EXCEPT
 	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", remoteSchemaName, csServerName, localSchemaName)
 	log.Tracef("query: %s", query)
 	_, err = dbConnection.Exec(cmd.Context(), query)
