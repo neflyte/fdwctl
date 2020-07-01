@@ -3,11 +3,11 @@ package cmd
 import (
 	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
+	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 	"strings"
 )
@@ -37,12 +37,6 @@ var (
 	dbConnection *pgx.Conn
 )
 
-type ServerObject struct {
-	Name    string
-	Wrapper string
-	Owner   string
-}
-
 func init() {
 	listCmd.AddCommand(listServerCmd)
 	listCmd.AddCommand(listExtensionCmd)
@@ -55,7 +49,7 @@ func preDoList(cmd *cobra.Command, _ []string) error {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "preDoList")
-	dbConnection, err = database.GetConnection(cmd.Context(), viper.GetString("FDWConnection"))
+	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().FDWConnection)
 	if err != nil {
 		log.Errorf("error getting database connection: %s", err)
 		return err
@@ -74,8 +68,17 @@ func listServers(cmd *cobra.Command, _ []string) {
 		WithContext(cmd.Context()).
 		WithField("function", "listServers")
 	query, _, err := sqrl.
-		Select("foreign_server_name, foreign_data_wrapper_name, authorization_identifier").
-		From("information_schema.foreign_servers").
+		Select(
+			"fs.foreign_server_name",
+			"fs.foreign_data_wrapper_name",
+			"fs.authorization_identifier",
+			"fsoh.option_value AS hostname",
+			"fsop.option_value AS port",
+			"fsod.option_value AS dbname",
+		).From("information_schema.foreign_servers fs").
+		Join("information_schema.foreign_server_options fsoh ON fsoh.foreign_server_name = fs.foreign_server_name AND fsoh.option_name = 'host'").
+		Join("information_schema.foreign_server_options fsop ON fsop.foreign_server_name = fs.foreign_server_name AND fsop.option_name = 'port'").
+		Join("information_schema.foreign_server_options fsod ON fsod.foreign_server_name = fs.foreign_server_name AND fsod.option_name = 'dbname'").
 		ToSql()
 	if err != nil {
 		log.Errorf("error creating query: %s", err)
@@ -90,63 +93,16 @@ func listServers(cmd *cobra.Command, _ []string) {
 	defer rows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Wrapper", "Owner", "Hostname", "Port", "DB Name"})
-	// FIXME: Do this in one SQL statement instead of many
-	servers := make([]ServerObject, 0)
-	var serverName, wrapperName, owner string
+	var serverName, wrapperName, owner, hostName, port, dbName string
 	for rows.Next() {
-		err = rows.Scan(&serverName, &wrapperName, &owner)
+		err = rows.Scan(&serverName, &wrapperName, &owner, &hostName, &port, &dbName)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
-		servers = append(servers, ServerObject{
-			Name:    serverName,
-			Wrapper: wrapperName,
-			Owner:   owner,
-		})
+		table.Append([]string{serverName, wrapperName, owner, hostName, port, dbName})
 	}
 	rows.Close()
-	var optionsRows pgx.Rows
-	var optionsQuery string
-	var optionsArgs []interface{}
-	for _, server := range servers {
-		optionsQuery, optionsArgs, err = sqrl.
-			Select("option_name", "option_value").
-			From("information_schema.foreign_server_options").
-			Where(sqrl.Eq{"foreign_server_name": server.Name}).
-			PlaceholderFormat(sqrl.Dollar).
-			ToSql()
-		if err != nil {
-			log.Errorf("error creating query: %s", err)
-			continue
-		}
-		log.Tracef("query: %s, args: %#v", optionsQuery, optionsArgs)
-		optionsRows, err = dbConnection.Query(cmd.Context(), optionsQuery, optionsArgs...)
-		if err != nil {
-			log.Errorf("error querying server options: %s", err)
-			continue
-		}
-		var optionName, optionValue, hostName, port, dbName string
-		for optionsRows.Next() {
-			err = optionsRows.Scan(&optionName, &optionValue)
-			if err != nil {
-				log.Errorf("error scanning result row: %s", err)
-				continue
-			}
-			switch optionName {
-			case "host":
-				hostName = optionValue
-			case "port":
-				port = optionValue
-			case "dbname":
-				dbName = optionValue
-			default:
-				log.Tracef("unknown option: %s", optionName)
-			}
-		}
-		table.Append([]string{server.Name, server.Wrapper, server.Owner, hostName, port, dbName})
-		optionsRows.Close()
-	}
 	table.Render()
 }
 

@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"strings"
 )
 
@@ -42,7 +42,7 @@ func preDoEdit(cmd *cobra.Command, _ []string) error {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "preDoEdit")
-	dbConnection, err = database.GetConnection(cmd.Context(), viper.GetString("FDWConnection"))
+	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().FDWConnection)
 	if err != nil {
 		log.Errorf("error getting database connection: %s", err)
 		return err

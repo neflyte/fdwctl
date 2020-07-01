@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"strings"
 )
 
@@ -27,13 +27,22 @@ var (
 		Run:   dropServer,
 		Args:  cobra.MinimumNArgs(1),
 	}
-	cascadeDrop bool
+	dropUsermapCmd = &cobra.Command{
+		Use:   "usermap <server name> <local user>",
+		Short: "drop a user mapping for a foreign server",
+		Run:   dropUsermap,
+		Args:  cobra.MinimumNArgs(2),
+	}
+	cascadeDrop   bool
+	dropLocalUser bool
 )
 
 func init() {
+	dropUsermapCmd.Flags().BoolVar(&dropLocalUser, "droplocal", false, "also drop the local USER object")
 	dropCmd.PersistentFlags().BoolVar(&cascadeDrop, "cascade", false, "drop objects with CASCADE option")
 	dropCmd.AddCommand(dropExtensionCmd)
 	dropCmd.AddCommand(dropServerCmd)
+	dropCmd.AddCommand(dropUsermapCmd)
 }
 
 func preDoDrop(cmd *cobra.Command, _ []string) error {
@@ -42,7 +51,7 @@ func preDoDrop(cmd *cobra.Command, _ []string) error {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "preDoDrop")
-	dbConnection, err = database.GetConnection(cmd.Context(), viper.GetString("FDWConnection"))
+	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().FDWConnection)
 	if err != nil {
 		log.Errorf("error getting database connection: %s", err)
 		return err
@@ -90,4 +99,39 @@ func dropServer(cmd *cobra.Command, args []string) {
 		return
 	}
 	log.Infof("server %s dropped", serverName)
+}
+
+func dropUsermap(cmd *cobra.Command, args []string) {
+	log := logger.
+		Root().
+		WithContext(cmd.Context()).
+		WithField("function", "dropUsermap")
+	duServerName := strings.TrimSpace(args[0])
+	if duServerName == "" {
+		log.Errorf("server name is required")
+		return
+	}
+	duLocalUser := strings.TrimSpace(args[1])
+	if duLocalUser == "" {
+		log.Errorf("local user name is required")
+		return
+	}
+	query := fmt.Sprintf("DROP USER MAPPING IF EXISTS FOR %s SERVER %s", duLocalUser, duServerName)
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.Exec(cmd.Context(), query)
+	if err != nil {
+		log.Errorf("error dropping user mapping: %s", err)
+		return
+	}
+	log.Infof("user mapping for %s dropped", duLocalUser)
+	if dropLocalUser {
+		query = fmt.Sprintf("DROP USER IF EXISTS %s", duLocalUser)
+		log.Tracef("query: %s", query)
+		_, err = dbConnection.Exec(cmd.Context(), query)
+		if err != nil {
+			log.Errorf("error dropping user: %s", err)
+			return
+		}
+		log.Infof("user %s dropped", duLocalUser)
+	}
 }
