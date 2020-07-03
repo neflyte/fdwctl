@@ -55,3 +55,40 @@ func EnsureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string
 	log.Infof("local schema %s exists", schemaName)
 	return nil
 }
+
+func GetSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schemaName string) ([]string, error) {
+	log := logger.Root().
+		WithContext(ctx).
+		WithField("function", "GetSchemaEnums")
+	query, args, err := sqrl.
+		Select("cuu.table_name", "cuu.udt_name").
+		From("information_schema.column_udt_usage cuu").
+		Join("pg_type t ON t.typname = cuu.udt_name").
+		Where(sqrl.And{
+			sqrl.Eq{"t.typcategory": "E"},
+			sqrl.Eq{"cuu.table_schema": schemaName},
+		}).
+		PlaceholderFormat(sqrl.Dollar).
+		ToSql()
+	if err != nil {
+		log.Errorf("error creating query: %s", err)
+		return nil, err
+	}
+	enumRows, err := dbConnection.Query(ctx, query, args...)
+	if err != nil {
+		log.Errorf("error querying enums: %s", err)
+		return nil, err
+	}
+	defer enumRows.Close()
+	enums := make([]string, 0)
+	var enumName string
+	for enumRows.Next() {
+		err = enumRows.Scan(&enumName)
+		if err != nil {
+			log.Errorf("error scanning result row: %s", err)
+			continue
+		}
+		enums = append(enums, enumName)
+	}
+	return enums, nil
+}
