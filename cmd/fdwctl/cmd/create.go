@@ -7,6 +7,7 @@ import (
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/cobra"
+	"sort"
 	"strings"
 )
 
@@ -33,20 +34,22 @@ var (
 		Run:   createUsermap,
 	}
 	createSchemaCmd = &cobra.Command{
-		Use:   "schema <local schema name>",
+		Use:   "schema",
 		Short: "Create (import) a schema from a foreign server",
 		Run:   createSchema,
 	}
-	serverHost       string
-	serverPort       string
-	serverDBName     string
-	localUser        string
-	remoteUser       string
-	remotePassword   string
-	serverName       string
-	localSchemaName  string
-	remoteSchemaName string
-	csServerName     string
+	serverHost           string
+	serverPort           string
+	serverDBName         string
+	localUser            string
+	remoteUser           string
+	remotePassword       string
+	serverName           string
+	localSchemaName      string
+	remoteSchemaName     string
+	csServerName         string
+	importEnums          bool
+	importEnumConnection string
 )
 
 func init() {
@@ -69,6 +72,8 @@ func init() {
 	createSchemaCmd.Flags().StringVar(&localSchemaName, "localschema", "", "local schema name")
 	createSchemaCmd.Flags().StringVar(&csServerName, "servername", "", "foreign server name")
 	createSchemaCmd.Flags().StringVar(&remoteSchemaName, "remoteschema", "", "the remote schema to import")
+	createSchemaCmd.Flags().BoolVar(&importEnums, "importenums", false, "attempt to auto-create ENUMs locally before import")
+	createSchemaCmd.Flags().StringVar(&importEnumConnection, "enumconnection", "", "connection string of database to import enums from")
 	_ = createSchemaCmd.MarkFlagRequired("localschema")
 	_ = createSchemaCmd.MarkFlagRequired("servername")
 	_ = createSchemaCmd.MarkFlagRequired("remoteschema")
@@ -114,8 +119,14 @@ func createServer(cmd *cobra.Command, _ []string) {
 	log := logger.Root().
 		WithContext(cmd.Context()).
 		WithField("function", "createServer")
-	hostSlug := strings.Replace(serverHost, ".", "-", -1)
+	hostSlug := strings.Replace(serverHost, ".", "_", -1)
 	serverSlug := fmt.Sprintf("%s_%s_%s", hostSlug, serverPort, serverDBName)
+	/* If the server slug starts with a number, prepend "server_" to it
+	   since PG doesn't like a number at the beginning of a server name. */
+	log.Debugf("serverSlug: %s", serverSlug)
+	if util.StartsWithNumber(serverSlug) {
+		serverSlug = fmt.Sprintf("server_%s", serverSlug)
+	}
 	query := fmt.Sprintf(
 		"CREATE SERVER %s FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%s', dbname '%s')",
 		serverSlug,
@@ -155,13 +166,65 @@ func createSchema(cmd *cobra.Command, _ []string) {
 	log := logger.Root().
 		WithContext(cmd.Context()).
 		WithField("function", "createSchema")
+	// Sanity Check
+	if importEnums && importEnumConnection == "" {
+		log.Errorf("enum database connection string is required when importing enums")
+		return
+	}
+	// Ensure the local schema exists
 	err := util.EnsureSchema(cmd.Context(), dbConnection, localSchemaName)
 	if err != nil {
 		log.Errorf("error ensuring local schema exists: %s", err)
 		return
 	}
+	if importEnums {
+		fdbConn, err := database.GetConnection(cmd.Context(), importEnumConnection)
+		if err != nil {
+			log.Errorf("error connecting to foreign database: %s", err)
+			return
+		}
+		defer database.CloseConnection(cmd.Context(), fdbConn)
+		remoteEnums, err := util.GetSchemaEnumsUsedInTables(cmd.Context(), fdbConn, remoteSchemaName)
+		if err != nil {
+			log.Errorf("error getting remote ENUMs: %s", err)
+			return
+		}
+		sort.Strings(remoteEnums)
+		// Get a list of local enums, too
+		localEnums, err := util.GetEnums(cmd.Context(), dbConnection)
+		if err != nil {
+			log.Errorf("error getting local ENUMs: %s", err)
+			return
+		}
+		sort.Strings(localEnums)
+		// Get enough data from remote database to re-create enums and then create them
+		for _, remoteEnum := range remoteEnums {
+			if sort.SearchStrings(localEnums, remoteEnum) != len(localEnums) {
+				log.Debugf("local enum %s exists", remoteEnum)
+				continue
+			}
+			enumStrings, err := util.GetEnumStrings(cmd.Context(), fdbConn, remoteEnum)
+			if err != nil {
+				log.Errorf("error getting enum values: %s", err)
+				return
+			}
+			query := fmt.Sprintf("CREATE TYPE %s AS ENUM (", remoteEnum)
+			quotedEnumStrings := make([]string, 0)
+			for _, enumString := range enumStrings {
+				quotedEnumStrings = append(quotedEnumStrings, fmt.Sprintf("'%s'", enumString))
+			}
+			query = fmt.Sprintf("%s %s )", query, strings.Join(quotedEnumStrings, ","))
+			log.Tracef("query: %s", query)
+			_, err = dbConnection.Exec(cmd.Context(), query)
+			if err != nil {
+				log.Errorf("error creating local enum type: %s", err)
+				return
+			}
+			log.Infof("enum type %s created", remoteEnum)
+		}
+	}
 	// TODO: support LIMIT TO and EXCEPT
-	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", remoteSchemaName, csServerName, localSchemaName)
+	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", remoteSchemaName, csServerName, localSchemaName) //nolint:gosec
 	log.Tracef("query: %s", query)
 	_, err = dbConnection.Exec(cmd.Context(), query)
 	if err != nil {

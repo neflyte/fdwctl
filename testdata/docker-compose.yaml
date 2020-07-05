@@ -21,6 +21,8 @@ services:
       POSTGRES_PASSWORD: r3m0TE!
       POSTGRES_USER: remoteuser
       POSTGRES_DB: remotedb
+    volumes:
+      - ./docker/postgres-remotedb:/docker-entrypoint-initdb.d
     networks:
       - fdwctl_net
 networks:

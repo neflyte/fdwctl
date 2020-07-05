@@ -1,7 +1,7 @@
 # fdwctl Makefile
 APPVERSION=0.0.1
 
-build:
+build: lint
 	CGO_ENABLED=0 go build -i -pkgdir "$(GOPATH)/pkg" -installsuffix nocgo -ldflags "-s -w -X main.cmd.AppVersion=$(APPVERSION)" -o fdwctl ./cmd/fdwctl
 	type -p upx >/dev/null && upx -q fdwctl
 
@@ -13,3 +13,6 @@ start-docker:
 
 stop-docker:
 	docker-compose -f testdata/docker-compose.yaml down -v
+
+lint:
+	golangci-lint run -E gosec
