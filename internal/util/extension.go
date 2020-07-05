@@ -22,6 +22,7 @@ func ExtensionIsCreated(ctx context.Context, dbconn *pgx.Conn) bool {
 		Where(sqrl.Eq{"extname": "postgres_fdw"}).
 		PlaceholderFormat(sqrl.Dollar).
 		ToSql()
+	log.Tracef("query: %s, args: %#v", query, args)
 	_, err := dbconn.Exec(ctx, query, args...)
 	if err != nil {
 		log.Errorf("error querying for extension: %s", err)
