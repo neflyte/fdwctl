@@ -56,6 +56,7 @@ func init() {
 	createServerCmd.Flags().StringVar(&serverHost, "serverhost", "", "hostname of the remote PG server")
 	createServerCmd.Flags().StringVar(&serverPort, "serverport", "5432", "port of the remote PG server")
 	createServerCmd.Flags().StringVar(&serverDBName, "serverdbname", "", "database name on remote PG server")
+	createServerCmd.Flags().StringVar(&csServerName, "servername", "", "foerign server name (optional)")
 	_ = createServerCmd.MarkFlagRequired("serverhost")
 	_ = createServerCmd.MarkFlagRequired("serverport")
 	_ = createServerCmd.MarkFlagRequired("serverdbname")
@@ -119,13 +120,16 @@ func createServer(cmd *cobra.Command, _ []string) {
 	log := logger.Root().
 		WithContext(cmd.Context()).
 		WithField("function", "createServer")
-	hostSlug := strings.Replace(serverHost, ".", "_", -1)
-	serverSlug := fmt.Sprintf("%s_%s_%s", hostSlug, serverPort, serverDBName)
-	/* If the server slug starts with a number, prepend "server_" to it
-	   since PG doesn't like a number at the beginning of a server name. */
-	log.Debugf("serverSlug: %s", serverSlug)
-	if util.StartsWithNumber(serverSlug) {
-		serverSlug = fmt.Sprintf("server_%s", serverSlug)
+	serverSlug := csServerName
+	if serverSlug == "" {
+		hostSlug := strings.Replace(serverHost, ".", "_", -1)
+		serverSlug = fmt.Sprintf("%s_%s_%s", hostSlug, serverPort, serverDBName)
+		/* If the server slug starts with a number, prepend "server_" to it
+		   since PG doesn't like a number at the beginning of a server name. */
+		log.Debugf("serverSlug: %s", serverSlug)
+		if util.StartsWithNumber(serverSlug) {
+			serverSlug = fmt.Sprintf("server_%s", serverSlug)
+		}
 	}
 	query := fmt.Sprintf(
 		"CREATE SERVER %s FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%s', dbname '%s')",
@@ -222,6 +226,8 @@ func createSchema(cmd *cobra.Command, _ []string) {
 			}
 			log.Infof("enum type %s created", remoteEnum)
 		}
+		// Close the foreign DB connection since we no longer need it
+		database.CloseConnection(cmd.Context(), fdbConn)
 	}
 	// TODO: support LIMIT TO and EXCEPT
 	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", remoteSchemaName, csServerName, localSchemaName) //nolint:gosec

@@ -43,7 +43,7 @@ func CloseConnection(ctx context.Context, conn *pgx.Conn) {
 		Root().
 		WithContext(ctx).
 		WithField("function", "CloseConnection")
-	if conn != nil {
+	if conn != nil && !conn.IsClosed() {
 		log.Debug("closing database connection")
 		err := conn.Close(ctx)
 		if err != nil {

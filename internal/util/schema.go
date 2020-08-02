@@ -47,7 +47,7 @@ func EnsureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(ctx, query)
 		if err != nil {
-			log.Errorf("error creating schema: %s")
+			log.Errorf("error creating schema: %s", err)
 			return err
 		}
 		log.Infof("local schema %s created", schemaName)
