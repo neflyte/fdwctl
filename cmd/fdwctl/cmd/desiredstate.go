@@ -74,12 +74,22 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 	}
 	// Update servers that were already in the DB
 	for _, serverAlreadyInDB := range serversAlreadyInDB {
-		err := util.UpdateServer(cmd.Context(), dbConnection, serverAlreadyInDB)
+		dsServer, err := util.FindDesiredStateServer(config.Instance().DesiredState.Servers, serverAlreadyInDB.Name)
 		if err != nil {
-			log.Errorf("error updating server: %s", err)
+			log.Errorf("cannot find desired state server %s: %s", serverAlreadyInDB.Name, err)
 			return
 		}
-		log.Infof("server %s updated", serverAlreadyInDB.Name)
+		dbServer := util.ForeignServerFromDesiredStateServer(*dsServer)
+		if !dbServer.Equals(serverAlreadyInDB) {
+			err := util.UpdateServer(cmd.Context(), dbConnection, serverAlreadyInDB)
+			if err != nil {
+				log.Errorf("error updating server: %s", err)
+				return
+			}
+			log.Infof("server %s updated", serverAlreadyInDB.Name)
+		} else {
+			log.Debugf("server %s is no different from the database; skipping it", serverAlreadyInDB.Name)
+		}
 	}
 	// Collect a list of servers to process UserMap and Schemas for
 	serversToProcess := make([]model.ForeignServer, 0)
@@ -122,12 +132,21 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 		}
 		// Update usermaps that are already there
 		for _, usermapToUpdate := range usModify {
-			err = util.UpdateUserMap(cmd.Context(), dbConnection, usermapToUpdate)
-			if err != nil {
-				log.Errorf("error updating user map for local user %s: %s", usermapToUpdate.LocalUser, err)
+			dbUserMap := util.FindUserMap(dbServerUsermaps, usermapToUpdate.LocalUser)
+			if dbUserMap == nil {
+				log.Errorf("cannot find user mapping for local user %s", usermapToUpdate.LocalUser)
 				return
 			}
-			log.Infof("user mapping %s -> %s updated", usermapToUpdate.LocalUser, usermapToUpdate.RemoteUser)
+			if !usermapToUpdate.Equals(*dbUserMap) {
+				err = util.UpdateUserMap(cmd.Context(), dbConnection, usermapToUpdate)
+				if err != nil {
+					log.Errorf("error updating user map for local user %s: %s", usermapToUpdate.LocalUser, err)
+					return
+				}
+				log.Infof("user mapping %s -> %s updated", usermapToUpdate.LocalUser, usermapToUpdate.RemoteUser)
+			} else {
+				log.Debugf("user mapping %s -> %s is no different from the database; skipping it", usermapToUpdate.LocalUser, usermapToUpdate.RemoteUser)
+			}
 		}
 		// Get DB remote schemas
 		dbSchemas, err := util.GetSchemas(cmd.Context(), dbConnection)

@@ -1,0 +1,28 @@
+{
+  "FDWConnection": "postgres://fdw:passw0rd@localhost:5432/fdw?sslmode=disable",
+  "DesiredState": {
+    "Servers": [
+      {
+        "name": "remotedb",
+        "host": "remotedb1",
+        "port": 5432,
+        "db": "remotedb",
+        "UserMap": [
+          {
+            "localuser": "fdw",
+            "remoteuser": "remoteuser",
+            "remotepassword": "r3m0TE!"
+          }
+        ],
+        "Schemas": [
+          {
+            "localschema": "remotedb",
+            "remoteschema": "public",
+            "importenums": true,
+            "enumconnection": "postgres://remoteuser:r3m0TE!@localhost:15432/remotedb?sslmode=disable"
+          }
+        ]
+      }
+    ]
+  }
+}
