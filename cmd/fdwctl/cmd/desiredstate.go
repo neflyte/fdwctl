@@ -110,6 +110,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 				log.Errorf("error creating user map for local user %s: %s", usermapToAdd.LocalUser, err)
 				return
 			}
+			log.Infof("user mapping %s -> %s created", usermapToAdd.LocalUser, usermapToAdd.RemoteUser)
 		}
 		// Update usermaps that are already there
 		for _, usermapToUpdate := range usModify {
@@ -118,6 +119,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 				log.Errorf("error updating user map for local user %s: %s", usermapToUpdate.LocalUser, err)
 				return
 			}
+			log.Infof("user mapping %s -> %s updated", usermapToUpdate.LocalUser, usermapToUpdate.RemoteUser)
 		}
 		// Get DB remote schemas
 		dbSchemas, err := util.GetSchemas(cmd.Context(), dbConnection)
@@ -131,9 +133,39 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 		schRemove, schAdd, schModify := util.DiffSchemas(dStateSchemas, dbSchemas)
 		// Drop schemas not in DState
 		for _, schemaToRemove := range schRemove {
-
+			err = util.DropSchema(cmd.Context(), dbConnection, schemaToRemove, true)
+			if err != nil {
+				log.Errorf("error dropping local schema %s: %s", schemaToRemove.LocalSchema, err)
+				return
+			}
+			log.Infof("local schema %s dropped", schemaToRemove.LocalSchema)
 		}
 		// Import schemas in DState but not imported
+		for _, schemaToAdd := range schAdd {
+			err = util.ImportSchema(cmd.Context(), dbConnection, dsServer.Name, schemaToAdd)
+			if err != nil {
+				log.Errorf("error importing into local schema %s: %s", schemaToAdd.LocalSchema, err)
+				return
+			}
+			log.Infof("foreign schema %s imported", schemaToAdd.RemoteSchema)
+		}
 		// Drop + Re-Import all other schemas
+		for _, schemaToModify := range schModify {
+			// Drop
+			err = util.DropSchema(cmd.Context(), dbConnection, schemaToModify, true)
+			if err != nil {
+				log.Errorf("error dropping local schema %s: %s", schemaToModify.LocalSchema, err)
+				return
+			}
+			// Import
+			err = util.ImportSchema(cmd.Context(), dbConnection, dsServer.Name, schemaToModify)
+			if err != nil {
+				log.Errorf("error importing into local schema %s: %s", schemaToModify.LocalSchema, err)
+				return
+			}
+			// Done
+			log.Infof("foreign schema %s re-imported", schemaToModify.RemoteSchema)
+		}
 	}
+	log.Info("desired state applied.")
 }

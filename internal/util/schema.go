@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
+	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
+	"sort"
+	"strings"
 )
 
 func EnsureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string) error {
@@ -236,4 +239,114 @@ func DiffSchemas(dStateSchemas []model.Schema, dbSchemas []model.Schema) (schRem
 		}
 	}
 	return
+}
+
+func DropSchema(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema, cascadeDrop bool) error {
+	// TODO: Figure out if it's feasible to also drop the foreign ENUMs as well to make the drop as clean as possible
+	log := logger.Root().
+		WithContext(ctx).
+		WithField("function", "DropSchema")
+	if schema.LocalSchema == "" {
+		log.Error("local schema name is required")
+		return fmt.Errorf("local schema name is required")
+	}
+	query := fmt.Sprintf("DROP SCHEMA %s", schema.LocalSchema)
+	if cascadeDrop {
+		query = fmt.Sprintf("%s CASCADE", query)
+	}
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.Exec(ctx, query)
+	if err != nil {
+		log.Errorf("error dropping schema: %s", err)
+		return err
+	}
+	return nil
+}
+
+func ImportSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema) error {
+	log := logger.Root().
+		WithContext(ctx).
+		WithField("function", "ImportSchemaEnums")
+	fdbConn, err := database.GetConnection(ctx, schema.ENUMConnection)
+	if err != nil {
+		log.Errorf("error connecting to foreign database: %s", err)
+		return err
+	}
+	defer database.CloseConnection(ctx, fdbConn)
+	remoteEnums, err := GetSchemaEnumsUsedInTables(ctx, fdbConn, schema.RemoteSchema)
+	if err != nil {
+		log.Errorf("error getting remote ENUMs: %s", err)
+		return err
+	}
+	sort.Strings(remoteEnums)
+	// Get a list of local enums, too
+	localEnums, err := GetEnums(ctx, dbConnection)
+	if err != nil {
+		log.Errorf("error getting local ENUMs: %s", err)
+		return err
+	}
+	sort.Strings(localEnums)
+	// Get enough data from remote database to re-create enums and then create them
+	for _, remoteEnum := range remoteEnums {
+		if sort.SearchStrings(localEnums, remoteEnum) != len(localEnums) {
+			log.Debugf("local enum %s exists", remoteEnum)
+			continue
+		}
+		enumStrings, err := GetEnumStrings(ctx, fdbConn, remoteEnum)
+		if err != nil {
+			log.Errorf("error getting enum values: %s", err)
+			return err
+		}
+		query := fmt.Sprintf("CREATE TYPE %s AS ENUM (", remoteEnum)
+		quotedEnumStrings := make([]string, 0)
+		for _, enumString := range enumStrings {
+			quotedEnumStrings = append(quotedEnumStrings, fmt.Sprintf("'%s'", enumString))
+		}
+		query = fmt.Sprintf("%s %s )", query, strings.Join(quotedEnumStrings, ","))
+		log.Tracef("query: %s", query)
+		_, err = dbConnection.Exec(ctx, query)
+		if err != nil {
+			log.Errorf("error creating local enum type: %s", err)
+			return err
+		}
+		log.Infof("enum type %s created", remoteEnum)
+	}
+	return nil
+}
+
+func ImportSchema(ctx context.Context, dbConnection *pgx.Conn, serverName string, schema model.Schema) error {
+	log := logger.Root().
+		WithContext(ctx).
+		WithField("function", "ImportSchema")
+	// Sanity Check
+	if serverName == "" {
+		log.Error("server name is required")
+		return fmt.Errorf("server name is required")
+	}
+	if schema.ImportENUMs && schema.ENUMConnection == "" {
+		log.Error("enum database connection string is required when importing enums")
+		return fmt.Errorf("enum database connection string is required when importing enums")
+	}
+	// Ensure the local schema exists
+	err := EnsureSchema(ctx, dbConnection, schema.LocalSchema)
+	if err != nil {
+		log.Errorf("error ensuring local schema exists: %s", err)
+		return err
+	}
+	if schema.ImportENUMs {
+		err = ImportSchemaEnums(ctx, dbConnection, schema)
+		if err != nil {
+			log.Errorf("error importing foreign enums: %s", err)
+			return err
+		}
+	}
+	// TODO: support LIMIT TO and EXCEPT
+	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", schema.RemoteSchema, serverName, schema.LocalSchema) //nolint:gosec
+	log.Tracef("query: %s", query)
+	_, err = dbConnection.Exec(ctx, query)
+	if err != nil {
+		log.Errorf("error importing foreign schema: %s", err)
+		return err
+	}
+	return nil
 }
