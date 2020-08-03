@@ -4,6 +4,7 @@ import (
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/model"
 	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/cobra"
 )
@@ -79,6 +80,13 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 			return
 		}
 		log.Infof("server %s updated", serverAlreadyInDB.Name)
+	}
+	// Collect a list of servers to process UserMap and Schemas for
+	serversToProcess := make([]model.ForeignServer, 0)
+	serversToProcess = append(serversToProcess, serversInDStateButNotInDB...)
+	serversToProcess = append(serversToProcess, serversAlreadyInDB...)
+	// Process UserMaps and Schemas
+	for _, serverAlreadyInDB := range serversToProcess {
 		// List Usermaps for this server in the DB
 		dbServerUsermaps, err := util.GetUserMapsForServer(cmd.Context(), dbConnection, serverAlreadyInDB.Name)
 		if err != nil {
