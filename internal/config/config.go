@@ -1,12 +1,14 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 	"os"
 	"path"
+	"strings"
 )
 
 const (
@@ -19,20 +21,25 @@ var (
 )
 
 type AppConfig struct {
-	FDWConnection string `yaml:"FDWConnection"`
+	FDWConnection string       `yaml:"FDWConnection"`
+	DesiredState  DesiredState `yaml:"DesiredState,omitempty"`
 }
 
 func init() {
-	instance = AppConfig{}
+	instance = AppConfig{
+		DesiredState: DesiredState{
+			Servers: make([]DesiredStateServer, 0),
+		},
+	}
 }
 
 func Instance() *AppConfig {
 	return &instance
 }
 
-func Load(ac *AppConfig) error {
+func UserConfigFile() string {
 	log := logger.Root().
-		WithField("function", "Load1w")
+		WithField("function", "UserConfigFile")
 	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
 	if xdgConfigHome == "" {
 		homedir, err := os.UserHomeDir()
@@ -45,9 +52,14 @@ func Load(ac *AppConfig) error {
 			xdgConfigHome = "."
 		}
 	}
-	cfgFullPath := path.Join(xdgConfigHome, XDGAppConfigDir, FileName)
+	return path.Join(xdgConfigHome, XDGAppConfigDir, FileName)
+}
+
+func Load(ac *AppConfig, fileName string) error {
+	log := logger.Root().
+		WithField("function", "Load")
 	fs := afero.NewOsFs()
-	configFileExists, err := afero.Exists(fs, cfgFullPath)
+	configFileExists, err := afero.Exists(fs, fileName)
 	if err != nil {
 		return fmt.Errorf("error checking existence of config file: %s", err)
 	}
@@ -55,11 +67,15 @@ func Load(ac *AppConfig) error {
 		log.Debugf("config file does not exist")
 		return nil
 	}
-	rawConfigBytes, err := afero.ReadFile(fs, cfgFullPath)
+	rawConfigBytes, err := afero.ReadFile(fs, fileName)
 	if err != nil {
 		return fmt.Errorf("error reading config file: %s", err)
 	}
-	err = yaml.Unmarshal(rawConfigBytes, ac)
+	if strings.HasSuffix(fileName, "json") {
+		err = json.Unmarshal(rawConfigBytes, ac)
+	} else {
+		err = yaml.Unmarshal(rawConfigBytes, ac)
+	}
 	if err != nil {
 		return fmt.Errorf("error unmarshaling config: %s", err)
 	}

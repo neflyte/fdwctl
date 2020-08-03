@@ -198,7 +198,16 @@ func listSchema(cmd *cobra.Command, _ []string) {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "listSchema")
-	query := "SELECT DISTINCT foreign_table_schema FROM information_schema.foreign_tables"
+	query, _, _ := sqrl.
+		Select("DISTINCT ft.foreign_table_schema", "ft.foreign_server_name", "ftos.option_value AS remote_schema").
+		From("information_schema.foreign_tables ft").
+		Join("information_schema.foreign_table_options ftos ON " +
+			"ftos.foreign_table_schema = ft.foreign_table_schema " +
+			"AND ftos.foreign_table_catalog = ft.foreign_table_catalog " +
+			"AND ftos.foreign_table_name = ft.foreign_table_name " +
+			"AND ftos.option_name = 'schema_name'").
+		PlaceholderFormat(sqrl.Dollar).
+		ToSql()
 	log.Tracef("query: %s", query)
 	schemaRows, err := dbConnection.Query(cmd.Context(), query)
 	if err != nil {
@@ -207,15 +216,15 @@ func listSchema(cmd *cobra.Command, _ []string) {
 	}
 	defer schemaRows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Schema Name"})
-	var schemaName string
+	table.SetHeader([]string{"Schema Name", "Foreign Server", "Remote Schema"})
+	var schemaName, foreignServer, foreignSchema string
 	for schemaRows.Next() {
-		err = schemaRows.Scan(&schemaName)
+		err = schemaRows.Scan(&schemaName, &foreignServer, &foreignSchema)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
-		table.Append([]string{schemaName})
+		table.Append([]string{schemaName, foreignServer, foreignSchema})
 	}
 	table.Render()
 }

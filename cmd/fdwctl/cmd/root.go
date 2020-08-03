@@ -18,6 +18,7 @@ var (
 	noLogo           bool
 	AppVersion       string
 	connectionString string
+	configFile       string
 )
 
 func Execute() error {
@@ -26,6 +27,7 @@ func Execute() error {
 
 func init() {
 	cobra.OnInitialize(initCommand, initConfig)
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "location of program configuration file")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "logformat", logger.TextFormat, "log output format [text, json]")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "loglevel", logger.TraceLevel, "log message level [trace, debug, info, warn, error, fatal, panic]")
 	rootCmd.PersistentFlags().StringVar(&connectionString, "connection", "", "database connection string")
@@ -34,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(dropCmd)
 	rootCmd.AddCommand(editCmd)
+	rootCmd.AddCommand(desiredStateCmd)
 }
 
 func initCommand() {
@@ -49,9 +52,15 @@ func initCommand() {
 }
 
 func initConfig() {
+	var err error
+
 	log := logger.Root().
 		WithField("function", "initConfig")
-	err := config.Load(config.Instance())
+	if configFile == "" {
+		configFile = config.UserConfigFile()
+	}
+	log.Debugf("configFile: %s", configFile)
+	err = config.Load(config.Instance(), configFile)
 	if err != nil {
 		log.Errorf("error initializing config: %s", err)
 		return

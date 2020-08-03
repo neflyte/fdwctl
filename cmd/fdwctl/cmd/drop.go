@@ -5,6 +5,7 @@ import (
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/cobra"
 	"strings"
 )
@@ -91,16 +92,7 @@ func dropServer(cmd *cobra.Command, args []string) {
 		WithContext(cmd.Context()).
 		WithField("function", "dropServer")
 	dsServerName := strings.TrimSpace(args[0])
-	if dsServerName == "" {
-		log.Errorf("server name is required")
-		return
-	}
-	query := fmt.Sprintf("DROP SERVER %s", dsServerName)
-	if cascadeDrop {
-		query = fmt.Sprintf("%s CASCADE", query)
-	}
-	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(cmd.Context(), query)
+	err := util.DropServer(cmd.Context(), dbConnection, dsServerName, cascadeDrop)
 	if err != nil {
 		log.Errorf("error dropping server: %s", err)
 		return
