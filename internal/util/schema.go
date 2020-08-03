@@ -199,6 +199,7 @@ func GetSchemas(ctx context.Context, dbConnection *pgx.Conn) ([]model.Schema, er
 			return nil, err
 		}
 		schemas = append(schemas, model.Schema{
+			ServerName:   foreignServer,
 			LocalSchema:  schemaName,
 			RemoteSchema: remoteSchema,
 		})

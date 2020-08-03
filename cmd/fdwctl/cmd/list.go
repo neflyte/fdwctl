@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"os"
@@ -73,42 +75,16 @@ func listServers(cmd *cobra.Command, _ []string) {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "listServers")
-	query, _, err := sqrl.
-		Select(
-			"fs.foreign_server_name",
-			"fs.foreign_data_wrapper_name",
-			"fs.authorization_identifier",
-			"fsoh.option_value AS hostname",
-			"fsop.option_value AS port",
-			"fsod.option_value AS dbname",
-		).From("information_schema.foreign_servers fs").
-		Join("information_schema.foreign_server_options fsoh ON fsoh.foreign_server_name = fs.foreign_server_name AND fsoh.option_name = 'host'").
-		Join("information_schema.foreign_server_options fsop ON fsop.foreign_server_name = fs.foreign_server_name AND fsop.option_name = 'port'").
-		Join("information_schema.foreign_server_options fsod ON fsod.foreign_server_name = fs.foreign_server_name AND fsod.option_name = 'dbname'").
-		ToSql()
+	servers, err := util.GetServers(cmd.Context(), dbConnection)
 	if err != nil {
-		log.Errorf("error creating query: %s", err)
+		log.Errorf("error getting servers: %s", err)
 		return
 	}
-	log.Tracef("query: %s", query)
-	rows, err := dbConnection.Query(cmd.Context(), query)
-	if err != nil {
-		log.Errorf("error querying for servers: %s", err)
-		return
-	}
-	defer rows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Wrapper", "Owner", "Hostname", "Port", "DB Name"})
-	var serverName, wrapperName, owner, hostName, port, dbName string
-	for rows.Next() {
-		err = rows.Scan(&serverName, &wrapperName, &owner, &hostName, &port, &dbName)
-		if err != nil {
-			log.Errorf("error scanning result row: %s", err)
-			continue
-		}
-		table.Append([]string{serverName, wrapperName, owner, hostName, port, dbName})
+	for _, server := range servers {
+		table.Append([]string{server.Name, server.Wrapper, server.Owner, server.Host, fmt.Sprintf("%d", server.Port), server.DB})
 	}
-	rows.Close()
 	table.Render()
 }
 
@@ -140,10 +116,7 @@ func listExtension(cmd *cobra.Command, _ []string) {
 			log.Errorf("error scanning result row: %s", err)
 			return
 		}
-		table.Append([]string{
-			extname,
-			extversion,
-		})
+		table.Append([]string{extname, extversion})
 	}
 	table.Render()
 }
@@ -158,37 +131,15 @@ func listUsermap(cmd *cobra.Command, args []string) {
 	if len(args) > 0 {
 		foreignServer = strings.TrimSpace(args[0])
 	}
-	sb := sqrl.
-		Select("u.authorization_identifier", "ou.option_value", "op.option_value", "s.srvname").
-		From("information_schema.user_mappings u").
-		Join("information_schema.user_mapping_options ou ON ou.authorization_identifier = u.authorization_identifier AND ou.option_name = 'user'").
-		Join("information_schema.user_mapping_options op ON op.authorization_identifier = u.authorization_identifier AND op.option_name = 'password'").
-		Join("pg_user_mappings s ON s.usename = u.authorization_identifier")
-	if foreignServer != "" {
-		sb = sb.Where(sqrl.Eq{"s.srvname": foreignServer})
-	}
-	query, qArgs, err := sb.PlaceholderFormat(sqrl.Dollar).ToSql()
+	usermaps, err := util.GetUserMapsForServer(cmd.Context(), dbConnection, foreignServer)
 	if err != nil {
-		log.Errorf("error creating query: %s", err)
+		log.Errorf("error getting usermaps for server %s: %s", foreignServer, err)
 		return
 	}
-	log.Tracef("query: %s, args: %#v", query, qArgs)
-	mappingRows, err := dbConnection.Query(cmd.Context(), query, qArgs...)
-	if err != nil {
-		log.Errorf("error selecting user mappings: %s", err)
-		return
-	}
-	defer mappingRows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Local User", "Remote User", "Remote Password", "Remote Server"})
-	var user, optUser, optPass, srvName string
-	for mappingRows.Next() {
-		err = mappingRows.Scan(&user, &optUser, &optPass, &srvName)
-		if err != nil {
-			log.Errorf("error scanning result row: %s", err)
-			continue
-		}
-		table.Append([]string{user, optUser, optPass, srvName})
+	for _, usermap := range usermaps {
+		table.Append([]string{usermap.LocalUser, usermap.RemoteUser, usermap.RemotePassword, usermap.ServerName})
 	}
 	table.Render()
 }
@@ -198,33 +149,15 @@ func listSchema(cmd *cobra.Command, _ []string) {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "listSchema")
-	query, _, _ := sqrl.
-		Select("DISTINCT ft.foreign_table_schema", "ft.foreign_server_name", "ftos.option_value AS remote_schema").
-		From("information_schema.foreign_tables ft").
-		Join("information_schema.foreign_table_options ftos ON " +
-			"ftos.foreign_table_schema = ft.foreign_table_schema " +
-			"AND ftos.foreign_table_catalog = ft.foreign_table_catalog " +
-			"AND ftos.foreign_table_name = ft.foreign_table_name " +
-			"AND ftos.option_name = 'schema_name'").
-		PlaceholderFormat(sqrl.Dollar).
-		ToSql()
-	log.Tracef("query: %s", query)
-	schemaRows, err := dbConnection.Query(cmd.Context(), query)
+	schemas, err := util.GetSchemas(cmd.Context(), dbConnection)
 	if err != nil {
-		log.Errorf("error listing schemas: %s", err)
+		log.Errorf("error getting schemas: %s", err)
 		return
 	}
-	defer schemaRows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Schema Name", "Foreign Server", "Remote Schema"})
-	var schemaName, foreignServer, foreignSchema string
-	for schemaRows.Next() {
-		err = schemaRows.Scan(&schemaName, &foreignServer, &foreignSchema)
-		if err != nil {
-			log.Errorf("error scanning result row: %s", err)
-			continue
-		}
-		table.Append([]string{schemaName, foreignServer, foreignSchema})
+	for _, schema := range schemas {
+		table.Append([]string{schema.LocalSchema, schema.ServerName, schema.RemoteSchema})
 	}
 	table.Render()
 }

@@ -20,7 +20,7 @@ func GetServers(ctx context.Context, dbConnection *pgx.Conn) ([]model.ForeignSer
 			"fs.foreign_data_wrapper_name",
 			"fs.authorization_identifier",
 			"fsoh.option_value AS hostname",
-			"fsop.option_value AS port",
+			"fsop.option_value::int AS port",
 			"fsod.option_value AS dbname",
 		).From("information_schema.foreign_servers fs").
 		Join("information_schema.foreign_server_options fsoh ON fsoh.foreign_server_name = fs.foreign_server_name AND fsoh.option_name = 'host'").

@@ -5,7 +5,10 @@ import (
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/cobra"
+	"strconv"
 	"strings"
 )
 
@@ -75,30 +78,25 @@ func editServer(cmd *cobra.Command, args []string) {
 		log.Errorf("server name is required")
 		return
 	}
-	// Edit server hostname, port, and dbname first
-	if editServerHost != "" || editServerPort != "" || editServerDBName != "" {
-		query := fmt.Sprintf("ALTER SERVER %s OPTIONS (", esServerName)
-		opts := make([]string, 0)
-		if editServerHost != "" {
-			opts = append(opts, fmt.Sprintf("SET host '%s'", editServerHost))
-		}
-		if editServerPort != "" {
-			opts = append(opts, fmt.Sprintf("SET port '%s'", editServerPort))
-		}
-		if editServerDBName != "" {
-			opts = append(opts, fmt.Sprintf("SET dbname '%s'", editServerDBName))
-		}
-		query = fmt.Sprintf("%s %s )", query, strings.Join(opts, ","))
-		log.Tracef("query: %s", query)
-		_, err := dbConnection.Exec(cmd.Context(), query)
-		if err != nil {
-			log.Errorf("error editing server: %s", err)
-			return
-		}
-		log.Infof("server %s edited", esServerName)
+	portInt, err := strconv.Atoi(editServerPort)
+	if err != nil {
+		log.Errorf("error converting port to integer: %s", err)
+		return
 	}
+	err = util.UpdateServer(cmd.Context(), dbConnection, model.ForeignServer{
+		Name: esServerName,
+		Host: editServerHost,
+		Port: portInt,
+		DB:   editServerDBName,
+	})
+	if err != nil {
+		log.Errorf("error editing server: %s", err)
+		return
+	}
+	log.Infof("server %s edited", esServerName)
 	// Rename server entry
 	if editServerName != "" {
+		// TODO: Move this to the `util` package
 		query := fmt.Sprintf("ALTER SERVER %s RENAME TO %s", esServerName, editServerName)
 		log.Tracef("query: %s", query)
 		_, err := dbConnection.Exec(cmd.Context(), query)
@@ -125,21 +123,12 @@ func editUsermap(cmd *cobra.Command, args []string) {
 		log.Errorf("local user name is required")
 		return
 	}
-	if editRemoteUser == "" && editRemotePassword == "" {
-		log.Warn("no remote user name or password specified; nothing to do")
-		return
-	}
-	optArgs := make([]string, 0)
-	query := fmt.Sprintf("ALTER USER MAPPING FOR %s SERVER %s OPTIONS (", euLocalUser, euServerName)
-	if editRemoteUser != "" {
-		optArgs = append(optArgs, fmt.Sprintf("SET user '%s'", editRemoteUser))
-	}
-	if editRemotePassword != "" {
-		optArgs = append(optArgs, fmt.Sprintf("SET password '%s'", editRemotePassword))
-	}
-	query = fmt.Sprintf("%s %s )", query, strings.Join(optArgs, ", "))
-	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(cmd.Context(), query)
+	err := util.UpdateUserMap(cmd.Context(), dbConnection, model.UserMap{
+		ServerName:     euServerName,
+		LocalUser:      euLocalUser,
+		RemoteUser:     editRemoteUser,
+		RemotePassword: editRemotePassword,
+	})
 	if err != nil {
 		log.Errorf("error editing user mapping: %s", err)
 		return

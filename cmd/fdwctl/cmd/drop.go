@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/model"
 	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/cobra"
 	"strings"
@@ -115,24 +115,15 @@ func dropUsermap(cmd *cobra.Command, args []string) {
 		log.Errorf("local user name is required")
 		return
 	}
-	query := fmt.Sprintf("DROP USER MAPPING IF EXISTS FOR %s SERVER %s", duLocalUser, duServerName)
-	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(cmd.Context(), query)
+	err := util.DropUserMap(cmd.Context(), dbConnection, model.UserMap{
+		ServerName: duServerName,
+		LocalUser:  duLocalUser,
+	}, dropLocalUser)
 	if err != nil {
 		log.Errorf("error dropping user mapping: %s", err)
 		return
 	}
 	log.Infof("user mapping for %s dropped", duLocalUser)
-	if dropLocalUser {
-		query = fmt.Sprintf("DROP USER IF EXISTS %s", duLocalUser)
-		log.Tracef("query: %s", query)
-		_, err = dbConnection.Exec(cmd.Context(), query)
-		if err != nil {
-			log.Errorf("error dropping user: %s", err)
-			return
-		}
-		log.Infof("user %s dropped", duLocalUser)
-	}
 }
 
 func dropSchema(cmd *cobra.Command, args []string) {
@@ -145,12 +136,9 @@ func dropSchema(cmd *cobra.Command, args []string) {
 		log.Errorf("schema name is required")
 		return
 	}
-	query := fmt.Sprintf("DROP SCHEMA %s", dsSchemaName)
-	if cascadeDrop {
-		query = fmt.Sprintf("%s CASCADE", query)
-	}
-	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(cmd.Context(), query)
+	err := util.DropSchema(cmd.Context(), dbConnection, model.Schema{
+		LocalSchema: dsSchemaName,
+	}, cascadeDrop)
 	if err != nil {
 		log.Errorf("error dropping schema: %s", err)
 		return

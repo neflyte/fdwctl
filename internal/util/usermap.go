@@ -23,13 +23,16 @@ func GetUserMapsForServer(ctx context.Context, dbConnection *pgx.Conn, foreignSe
 	log := logger.Root().
 		WithContext(ctx).
 		WithField("function", "GetUserMapsForServer")
-	query, qArgs, err := sqrl.
+	qbuilder := sqrl.
 		Select("u.authorization_identifier", "ou.option_value", "op.option_value", "s.srvname").
 		From("information_schema.user_mappings u").
 		Join("information_schema.user_mapping_options ou ON ou.authorization_identifier = u.authorization_identifier AND ou.option_name = 'user'").
 		Join("information_schema.user_mapping_options op ON op.authorization_identifier = u.authorization_identifier AND op.option_name = 'password'").
-		Join("pg_user_mappings s ON s.usename = u.authorization_identifier").
-		Where(sqrl.Eq{"s.srvname": foreignServer}).
+		Join("pg_user_mappings s ON s.usename = u.authorization_identifier")
+	if foreignServer != "" {
+		qbuilder = qbuilder.Where(sqrl.Eq{"s.srvname": foreignServer})
+	}
+	query, qArgs, err := qbuilder.
 		PlaceholderFormat(sqrl.Dollar).
 		ToSql()
 	if err != nil {
