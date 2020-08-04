@@ -29,8 +29,7 @@ func preDoDesiredState(cmd *cobra.Command, _ []string) error {
 		WithField("function", "preDoDesiredState")
 	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().FDWConnection)
 	if err != nil {
-		log.Errorf("error getting database connection: %s", err)
-		return err
+		return logger.ErrorfAsError(log, "error getting database connection: %s", err)
 	}
 	return nil
 }
@@ -58,10 +57,10 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 	for _, serverNotInDState := range serversInDBButNotInDState {
 		err := util.DropServer(cmd.Context(), dbConnection, serverNotInDState.Name, true)
 		if err != nil {
-			log.Errorf("error dropping server %s that is not in desired state: %s", serverNotInDState, err)
+			log.Errorf("error dropping server %s that is not in desired state: %s", serverNotInDState.Name, err)
 			return
 		}
-		log.Infof("server %s dropped", serverNotInDState)
+		log.Infof("server %s dropped", serverNotInDState.Name)
 	}
 	// Create servers that are in DState but not yet in DB
 	for _, serverNotInDB := range serversInDStateButNotInDB {

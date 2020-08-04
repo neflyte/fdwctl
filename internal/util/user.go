@@ -57,8 +57,7 @@ func DropUser(ctx context.Context, dbConnection *pgx.Conn, username string) erro
 		WithContext(ctx).
 		WithField("function", "DropUser")
 	if username == "" {
-		log.Errorf("user name is required")
-		return fmt.Errorf("user name is required")
+		return logger.ErrorfAsError(log, "user name is required")
 	}
 	query := fmt.Sprintf("DROP USER IF EXISTS %s", username)
 	log.Tracef("query: %s", query)

@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
@@ -61,7 +60,7 @@ func Load(ac *AppConfig, fileName string) error {
 	fs := afero.NewOsFs()
 	configFileExists, err := afero.Exists(fs, fileName)
 	if err != nil {
-		return fmt.Errorf("error checking existence of config file: %s", err)
+		return logger.ErrorfAsError(log, "error checking existence of config file: %s", err)
 	}
 	if !configFileExists {
 		log.Debugf("config file does not exist")
@@ -69,7 +68,7 @@ func Load(ac *AppConfig, fileName string) error {
 	}
 	rawConfigBytes, err := afero.ReadFile(fs, fileName)
 	if err != nil {
-		return fmt.Errorf("error reading config file: %s", err)
+		return logger.ErrorfAsError(log, "error reading config file: %s", err)
 	}
 	if strings.HasSuffix(fileName, "json") {
 		err = json.Unmarshal(rawConfigBytes, ac)
@@ -77,7 +76,7 @@ func Load(ac *AppConfig, fileName string) error {
 		err = yaml.Unmarshal(rawConfigBytes, ac)
 	}
 	if err != nil {
-		return fmt.Errorf("error unmarshaling config: %s", err)
+		return logger.ErrorfAsError(log, "error unmarshaling config: %s", err)
 	}
 	return nil
 }

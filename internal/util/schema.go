@@ -248,8 +248,7 @@ func DropSchema(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema
 		WithContext(ctx).
 		WithField("function", "DropSchema")
 	if schema.LocalSchema == "" {
-		log.Error("local schema name is required")
-		return fmt.Errorf("local schema name is required")
+		return logger.ErrorfAsError(log, "local schema name is required")
 	}
 	query := fmt.Sprintf("DROP SCHEMA %s", schema.LocalSchema)
 	if cascadeDrop {
@@ -321,12 +320,10 @@ func ImportSchema(ctx context.Context, dbConnection *pgx.Conn, serverName string
 		WithField("function", "ImportSchema")
 	// Sanity Check
 	if serverName == "" {
-		log.Error("server name is required")
-		return fmt.Errorf("server name is required")
+		return logger.ErrorfAsError(log, "server name is required")
 	}
 	if schema.ImportENUMs && schema.ENUMConnection == "" {
-		log.Error("enum database connection string is required when importing enums")
-		return fmt.Errorf("enum database connection string is required when importing enums")
+		return logger.ErrorfAsError(log, "enum database connection string is required when importing enums")
 	}
 	// Ensure the local schema exists
 	err := EnsureSchema(ctx, dbConnection, schema.LocalSchema)

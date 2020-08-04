@@ -1,6 +1,8 @@
 package logger
 
 import (
+	"errors"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"strings"
 )
@@ -64,4 +66,13 @@ func SetLevel(level string) {
 
 func Root() *logrus.Logger {
 	return rootLogger
+}
+
+// ErrorfAsError logs an Error message to the supplied logger and then returns a
+// new error object initialized with the message. The message is formatted with
+// fmt.Sprintf() before passing to the logger and the error object.
+func ErrorfAsError(log logrus.FieldLogger, format string, args ...interface{}) error {
+	message := fmt.Sprintf(format, args...)
+	log.Error(message)
+	return errors.New(message)
 }

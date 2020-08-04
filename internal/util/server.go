@@ -65,8 +65,7 @@ func DropServer(ctx context.Context, dbConnection *pgx.Conn, servername string, 
 		WithContext(ctx).
 		WithField("function", "DropServer")
 	if servername == "" {
-		log.Errorf("server name is required")
-		return fmt.Errorf("server name is required")
+		return logger.ErrorfAsError(log, "server name is required")
 	}
 	query := fmt.Sprintf("DROP SERVER %s", servername)
 	if cascade {

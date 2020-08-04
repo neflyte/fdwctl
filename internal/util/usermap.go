@@ -87,8 +87,7 @@ func DropUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.User
 		WithContext(ctx).
 		WithField("function", "DropUserMap")
 	if usermap.ServerName == "" {
-		log.Errorf("server name is required")
-		return fmt.Errorf("server name is required")
+		return logger.ErrorfAsError(log, "server name is required")
 	}
 	query := fmt.Sprintf("DROP USER MAPPING IF EXISTS FOR %s SERVER %s", usermap.LocalUser, usermap.ServerName)
 	log.Tracef("query: %s", query)
@@ -113,8 +112,7 @@ func CreateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.Us
 		WithContext(ctx).
 		WithField("function", "CreateUserMap")
 	if usermap.ServerName == "" {
-		log.Errorf("server name is required")
-		return fmt.Errorf("server name is required")
+		return logger.ErrorfAsError(log, "server name is required")
 	}
 	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, usermap.RemotePassword)
 	log.Tracef("query: %s", query)
@@ -131,8 +129,7 @@ func UpdateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.Us
 		WithContext(ctx).
 		WithField("function", "UpdateUserMap")
 	if usermap.ServerName == "" {
-		log.Errorf("server name is required")
-		return fmt.Errorf("server name is required")
+		return logger.ErrorfAsError(log, "server name is required")
 	}
 	optArgs := make([]string, 0)
 	query := fmt.Sprintf("ALTER USER MAPPING FOR %s SERVER %s OPTIONS (", usermap.LocalUser, usermap.ServerName)

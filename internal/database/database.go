@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"errors"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -26,7 +25,7 @@ func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, err
 		WithContext(ctx).
 		WithField("function", "GetConnection")
 	if connectionString == "" {
-		return nil, errors.New("database connection string is required")
+		return nil, logger.ErrorfAsError(log, "database connection string is required")
 	}
 	log.Debugf("opening database connection to %s", connectionString)
 	conn, err := pgx.Connect(ctx, connectionString)

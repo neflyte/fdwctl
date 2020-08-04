@@ -59,8 +59,7 @@ func preDoList(cmd *cobra.Command, _ []string) error {
 		WithField("function", "preDoList")
 	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().FDWConnection)
 	if err != nil {
-		log.Errorf("error getting database connection: %s", err)
-		return err
+		return logger.ErrorfAsError(log, "error getting database connection: %s", err)
 	}
 	return nil
 }
