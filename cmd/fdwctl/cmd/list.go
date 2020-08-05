@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
@@ -92,30 +91,15 @@ func listExtension(cmd *cobra.Command, _ []string) {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "listExtension")
-	query, _, err := sqrl.
-		Select("extname", "extversion").
-		From("pg_extension").
-		ToSql()
+	exts, err := util.GetExtensions(cmd.Context(), dbConnection)
 	if err != nil {
-		log.Errorf("error creating query: %s", err)
+		log.Errorf("error getting extensions: %s", err)
 		return
 	}
-	rows, err := dbConnection.Query(cmd.Context(), query)
-	if err != nil {
-		log.Errorf("error querying for extensions: %s", err)
-		return
-	}
-	defer rows.Close()
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Version"})
-	var extname, extversion string
-	for rows.Next() {
-		err = rows.Scan(&extname, &extversion)
-		if err != nil {
-			log.Errorf("error scanning result row: %s", err)
-			return
-		}
-		table.Append([]string{extname, extversion})
+	for _, ext := range exts {
+		table.Append([]string{ext.Name, ext.Version})
 	}
 	table.Render()
 }

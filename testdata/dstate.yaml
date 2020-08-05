@@ -2,6 +2,8 @@
 #
 FDWConnection: "postgres://fdw:passw0rd@localhost:5432/fdw?sslmode=disable"
 DesiredState:
+  Extensions:
+    - name: postgres_fdw
   Servers:
     - name: remotedb
       host: remotedb1

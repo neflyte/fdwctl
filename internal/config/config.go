@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/model"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -19,6 +20,11 @@ var (
 	instance AppConfig
 )
 
+type DesiredState struct {
+	Extensions []model.Extension     `yaml:"Extensions,omitempty" json:"Extensions,omitempty"`
+	Servers    []model.ForeignServer `yaml:"Servers,omitempty" json:"Servers,omitempty"`
+}
+
 type AppConfig struct {
 	FDWConnection string       `yaml:"FDWConnection"`
 	DesiredState  DesiredState `yaml:"DesiredState,omitempty"`
@@ -27,7 +33,8 @@ type AppConfig struct {
 func init() {
 	instance = AppConfig{
 		DesiredState: DesiredState{
-			Servers: make([]DesiredStateServer, 0),
+			Extensions: make([]model.Extension, 0),
+			Servers:    make([]model.ForeignServer, 0),
 		},
 	}
 }

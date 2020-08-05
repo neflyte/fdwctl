@@ -26,7 +26,7 @@ var (
 	}
 	createExtensionCmd = &cobra.Command{
 		Use:   "extension",
-		Short: "Create the postgres_fdw extension",
+		Short: "Create a PG extension (usually postgres_fdw)",
 		Run:   createExtension,
 	}
 	createUsermapCmd = &cobra.Command{
@@ -51,6 +51,7 @@ var (
 	csServerName         string
 	importEnums          bool
 	importEnumConnection string
+	extName              string
 )
 
 func init() {
@@ -61,6 +62,9 @@ func init() {
 	_ = createServerCmd.MarkFlagRequired("serverhost")
 	_ = createServerCmd.MarkFlagRequired("serverport")
 	_ = createServerCmd.MarkFlagRequired("serverdbname")
+
+	createExtensionCmd.Flags().StringVar(&extName, "extname", "postgres_fdw", "name of the extension to create")
+	_ = createExtensionCmd.MarkFlagRequired("extname")
 
 	createUsermapCmd.Flags().StringVar(&serverName, "servername", "", "foreign server name")
 	createUsermapCmd.Flags().StringVar(&localUser, "localuser", "", "local user name")
@@ -107,10 +111,11 @@ func createExtension(cmd *cobra.Command, _ []string) {
 	log := logger.Root().
 		WithContext(cmd.Context()).
 		WithField("function", "createExtension")
-	query := "CREATE EXTENSION IF NOT EXISTS postgres_fdw"
-	_, err := dbConnection.Exec(cmd.Context(), query)
+	err := util.CreateExtension(cmd.Context(), dbConnection, model.Extension{
+		Name: "postgres_fdw",
+	})
 	if err != nil {
-		log.Errorf("error creating fdw extension: %s", err)
+		log.Errorf("error creating postgres_fdw extension: %s", err)
 		return
 	}
 	log.Info("extension postgres_fdw created")

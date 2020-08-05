@@ -19,7 +19,7 @@ var (
 	}
 	dropExtensionCmd = &cobra.Command{
 		Use:   "extension",
-		Short: "Drop the postgres_fdw extension",
+		Short: "Drop a PG extension (usually postgres_fdw)",
 		Run:   dropExtension,
 	}
 	dropServerCmd = &cobra.Command{
@@ -42,10 +42,15 @@ var (
 	}
 	cascadeDrop   bool
 	dropLocalUser bool
+	dropExtName   string
 )
 
 func init() {
+	dropExtensionCmd.Flags().StringVar(&dropExtName, "extname", "postgres_fdw", "name of the PG extension to drop")
+	_ = dropExtensionCmd.MarkFlagRequired("extname")
+
 	dropUsermapCmd.Flags().BoolVar(&dropLocalUser, "droplocal", false, "also drop the local USER object")
+
 	dropCmd.PersistentFlags().BoolVar(&cascadeDrop, "cascade", false, "drop objects with CASCADE option")
 	dropCmd.AddCommand(dropExtensionCmd)
 	dropCmd.AddCommand(dropServerCmd)
@@ -75,14 +80,14 @@ func dropExtension(cmd *cobra.Command, _ []string) {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "dropExtension")
-	query := "DROP EXTENSION IF EXISTS postgres_fdw"
-	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(cmd.Context(), query)
+	err := util.DropExtension(cmd.Context(), dbConnection, model.Extension{
+		Name: dropExtName,
+	})
 	if err != nil {
-		log.Errorf("error dropping fdw extension: %s", err)
+		log.Errorf("error dropping extension %s: %s", dropExtName, err)
 		return
 	}
-	log.Info("extension postgres_fdw dropped")
+	log.Info("extension %s dropped", dropExtName)
 }
 
 func dropServer(cmd *cobra.Command, args []string) {

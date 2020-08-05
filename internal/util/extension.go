@@ -2,31 +2,97 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/model"
 )
 
-func ExtensionIsCreated(ctx context.Context, dbconn *pgx.Conn) bool {
-	log := logger.
-		Root().
+func GetExtensions(ctx context.Context, dbConnection *pgx.Conn) ([]model.Extension, error) {
+	log := logger.Root().
 		WithContext(ctx).
-		WithField("function", "extensionIsCreated")
-	if dbconn == nil {
-		log.Error("nil db connection")
-		return false
-	}
-	query, args, _ := sqrl.
-		Select("1").
+		WithField("function", "GetExtensions")
+	exts := make([]model.Extension, 0)
+	query, _, err := sqrl.
+		Select("extname", "extversion").
 		From("pg_extension").
-		Where(sqrl.Eq{"extname": "postgres_fdw"}).
-		PlaceholderFormat(sqrl.Dollar).
 		ToSql()
-	log.Tracef("query: %s, args: %#v", query, args)
-	_, err := dbconn.Exec(ctx, query, args...)
 	if err != nil {
-		log.Errorf("error querying for extension: %s", err)
-		return false
+		log.Errorf("error creating query: %s", err)
+		return nil, err
 	}
-	return true
+	rows, err := dbConnection.Query(ctx, query)
+	if err != nil {
+		log.Errorf("error querying for extensions: %s", err)
+		return nil, err
+	}
+	defer rows.Close()
+	var extname, extversion string
+	for rows.Next() {
+		err = rows.Scan(&extname, &extversion)
+		if err != nil {
+			log.Errorf("error scanning result row: %s", err)
+			return nil, err
+		}
+		exts = append(exts, model.Extension{
+			Name:    extname,
+			Version: extversion,
+		})
+	}
+	return exts, nil
+}
+
+func DiffExtensions(dStateExts []model.Extension, dbExts []model.Extension) (extRemove []model.Extension, extAdd []model.Extension) {
+	extRemove = make([]model.Extension, 0)
+	extAdd = make([]model.Extension, 0)
+	// extRemove
+	for _, dbExt := range dbExts {
+		foundDStateExt := false
+		for _, dStateExt := range dStateExts {
+			if dStateExt.Equals(dbExt) {
+				foundDStateExt = true
+				break
+			}
+		}
+		if !foundDStateExt {
+			extRemove = append(extRemove, dbExt)
+		}
+	}
+	// extAdd
+	for _, dStateExt := range dStateExts {
+		foundDBExt := false
+		for _, dbExt := range dbExts {
+			if dbExt.Equals(dStateExt) {
+				foundDBExt = true
+				break
+			}
+		}
+		if !foundDBExt {
+			extAdd = append(extAdd, dStateExt)
+		}
+	}
+	return
+}
+
+func CreateExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Extension) error {
+	log := logger.Root().
+		WithContext(ctx).
+		WithField("function", "CreateExtension")
+	_, err := dbConnection.Exec(ctx, fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS %s`, ext.Name))
+	if err != nil {
+		return logger.ErrorfAsError(log, "error creating extension %s: %s", ext.Name, err)
+	}
+	return nil
+}
+
+func DropExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Extension) error {
+	log := logger.Root().
+		WithContext(ctx).
+		WithField("function", "DropExtension")
+	_, err := dbConnection.Exec(ctx, fmt.Sprintf(`DROP EXTENSION IF EXISTS %s`, ext.Name))
+	if err != nil {
+		return logger.ErrorfAsError(log, "error dropping extension %s: %s", ext.Name, err)
+	}
+	return nil
 }
