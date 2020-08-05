@@ -19,7 +19,9 @@
           {
             "localuser": "fdw",
             "remoteuser": "remoteuser",
-            "remotepassword": "r3m0TE!"
+            "remotesecret": {
+              "value": "r3m0TE!"
+            }
           }
         ],
         "Schemas": [
@@ -27,7 +29,10 @@
             "localschema": "remotedb",
             "remoteschema": "public",
             "importenums": true,
-            "enumconnection": "postgres://remoteuser:r3m0TE!@localhost:15432/remotedb?sslmode=disable"
+            "enumconnection": "postgres://remoteuser@localhost:15432/remotedb?sslmode=disable",
+            "enumsecret": {
+              "value": "r3m0TE!"
+            }
           }
         ]
       }

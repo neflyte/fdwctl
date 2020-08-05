@@ -122,7 +122,7 @@ func listUsermap(cmd *cobra.Command, args []string) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Local User", "Remote User", "Remote Password", "Remote Server"})
 	for _, usermap := range usermaps {
-		table.Append([]string{usermap.LocalUser, usermap.RemoteUser, usermap.RemotePassword, usermap.ServerName})
+		table.Append([]string{usermap.LocalUser, usermap.RemoteUser, usermap.RemoteSecret.Value, usermap.ServerName})
 	}
 	table.Render()
 }

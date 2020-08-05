@@ -53,7 +53,6 @@ func ConnectionStringWithSecret(connURL *url.URL, secret model.Secret) string {
 		log.Tracef("returning %s", connURL.String())
 		return connURL.String()
 	}
-	log.Trace("got secret value")
 	connURL.User = url.UserPassword(connURL.User.Username(), secretValue)
 	return connURL.String()
 }

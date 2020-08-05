@@ -6,4 +6,5 @@ type Schema struct {
 	RemoteSchema   string `yaml:"remoteschema" json:"remoteschema"`
 	ImportENUMs    bool   `yaml:"importenums" json:"importenums"`
 	ENUMConnection string `yaml:"enumconnection,omitempty" json:"enumconnection,omitempty"`
+	ENUMSecret     Secret `yaml:"enumsecret,omitempty" json:"enumsecret,omitempty"`
 }

@@ -17,5 +17,8 @@ start-docker:
 stop-docker:
 	docker-compose -f testdata/docker-compose.yaml down -v
 
+restart-docker: stop-docker start-docker
+	@echo "services restarted."
+
 lint:
 	golangci-lint run -E gosec

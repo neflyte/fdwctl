@@ -123,10 +123,12 @@ func editUsermap(cmd *cobra.Command, args []string) {
 		return
 	}
 	err := util.UpdateUserMap(cmd.Context(), dbConnection, model.UserMap{
-		ServerName:     euServerName,
-		LocalUser:      euLocalUser,
-		RemoteUser:     editRemoteUser,
-		RemotePassword: editRemotePassword,
+		ServerName: euServerName,
+		LocalUser:  euLocalUser,
+		RemoteUser: editRemoteUser,
+		RemoteSecret: model.Secret{
+			Value: editRemotePassword,
+		},
 	})
 	if err != nil {
 		log.Errorf("error editing user mapping: %s", err)

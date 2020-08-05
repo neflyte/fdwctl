@@ -164,10 +164,12 @@ func createUsermap(cmd *cobra.Command, _ []string) {
 		return
 	}
 	err = util.CreateUserMap(cmd.Context(), dbConnection, model.UserMap{
-		ServerName:     serverName,
-		LocalUser:      localUser,
-		RemoteUser:     remoteUser,
-		RemotePassword: remotePassword,
+		ServerName: serverName,
+		LocalUser:  localUser,
+		RemoteUser: remoteUser,
+		RemoteSecret: model.Secret{
+			Value: remotePassword,
+		},
 	})
 	if err != nil {
 		log.Errorf("error creating user mapping: %s", err)

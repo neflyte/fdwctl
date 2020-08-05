@@ -267,7 +267,8 @@ func ImportSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model
 	log := logger.Root().
 		WithContext(ctx).
 		WithField("function", "ImportSchemaEnums")
-	fdbConn, err := database.GetConnection(ctx, schema.ENUMConnection)
+	fdbConnStr := ResolveConnectionString(schema.ENUMConnection, &schema.ENUMSecret)
+	fdbConn, err := database.GetConnection(ctx, fdbConnStr)
 	if err != nil {
 		log.Errorf("error connecting to foreign database: %s", err)
 		return err

@@ -49,7 +49,7 @@ func GetUserMapsForServer(ctx context.Context, dbConnection *pgx.Conn, foreignSe
 	users := make([]model.UserMap, 0)
 	for userRows.Next() {
 		user := new(model.UserMap)
-		err = userRows.Scan(&user.LocalUser, &user.RemoteUser, &user.RemotePassword, &user.ServerName)
+		err = userRows.Scan(&user.LocalUser, &user.RemoteUser, &user.RemoteSecret.Value, &user.ServerName)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
@@ -108,15 +108,27 @@ func DropUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.User
 }
 
 func CreateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.UserMap) error {
+	var secretValue string
+	var err error
 	log := logger.Root().
 		WithContext(ctx).
 		WithField("function", "CreateUserMap")
 	if usermap.ServerName == "" {
 		return logger.ErrorfAsError(log, "server name is required")
 	}
-	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, usermap.RemotePassword)
+	// Check if the secret is defined before resolving it
+	if SecretIsDefined(usermap.RemoteSecret) {
+		secretValue, err = GetSecret(ctx, usermap.RemoteSecret)
+		if err != nil {
+			return logger.ErrorfAsError(log, "error getting secret value: %s", err)
+		}
+	} else {
+		secretValue = ""
+	}
+	// FIXME: There could be no password at all; check for a password before using it in the SQL statement
+	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, secretValue)
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(ctx, query)
+	_, err = dbConnection.Exec(ctx, query)
 	if err != nil {
 		log.Errorf("error creating user mapping: %s", err)
 		return err
@@ -136,8 +148,12 @@ func UpdateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.Us
 	if usermap.RemoteUser != "" {
 		optArgs = append(optArgs, fmt.Sprintf("SET user '%s'", usermap.RemoteUser))
 	}
-	if usermap.RemotePassword != "" {
-		optArgs = append(optArgs, fmt.Sprintf("SET password '%s'", usermap.RemotePassword))
+	if SecretIsDefined(usermap.RemoteSecret) {
+		secretValue, err := GetSecret(ctx, usermap.RemoteSecret)
+		if err != nil {
+			return logger.ErrorfAsError(log, "error getting secret value: %s", err)
+		}
+		optArgs = append(optArgs, fmt.Sprintf("SET password '%s'", secretValue))
 	}
 	query = fmt.Sprintf("%s %s )", query, strings.Join(optArgs, ", "))
 	log.Tracef("query: %s", query)
