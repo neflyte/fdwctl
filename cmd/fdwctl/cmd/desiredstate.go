@@ -13,7 +13,7 @@ import (
 
 var (
 	desiredStateCmd = &cobra.Command{
-		Use:               "desiredstate",
+		Use:               "apply",
 		Short:             "Apply a desired state",
 		Long:              "Apply a desired state configuration to the FDW database",
 		PersistentPreRunE: preDoDesiredState,
