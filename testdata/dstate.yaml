@@ -1,6 +1,9 @@
 # fdwctl desired state config
 #
-FDWConnection: "postgres://fdw:passw0rd@localhost:5432/fdw?sslmode=disable"
+#FDWConnection: "postgres://fdw@localhost:5432/fdw?sslmode=disable"
+FDWConnection: "host=localhost port=5432 dbname=fdw user=fdw sslmode=disable"
+FDWConnectionSecret:
+  value: "passw0rd"
 DesiredState:
   Extensions:
     - name: postgres_fdw

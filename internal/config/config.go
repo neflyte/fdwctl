@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -26,12 +27,15 @@ type DesiredState struct {
 }
 
 type AppConfig struct {
-	FDWConnection string       `yaml:"FDWConnection"`
-	DesiredState  DesiredState `yaml:"DesiredState,omitempty"`
+	FDWConnection       string       `yaml:"FDWConnection" json:"FDWConnection"`
+	FDWConnectionSecret model.Secret `yaml:"FDWConnectionSecret,omitempty" json:"FDWConnectionSecret,omitempty"`
+	DesiredState        DesiredState `yaml:"DesiredState,omitempty" json:"DesiredState,omitempty"`
+	dbConnectionString  string
 }
 
 func init() {
 	instance = AppConfig{
+		FDWConnectionSecret: model.Secret{},
 		DesiredState: DesiredState{
 			Extensions: make([]model.Extension, 0),
 			Servers:    make([]model.ForeignServer, 0),
@@ -77,6 +81,7 @@ func Load(ac *AppConfig, fileName string) error {
 	if err != nil {
 		return logger.ErrorfAsError(log, "error reading config file: %s", err)
 	}
+	// log.Tracef("rawConfigBytes: %s", rawConfigBytes)
 	if strings.HasSuffix(fileName, "json") {
 		err = json.Unmarshal(rawConfigBytes, ac)
 	} else {
@@ -85,5 +90,13 @@ func Load(ac *AppConfig, fileName string) error {
 	if err != nil {
 		return logger.ErrorfAsError(log, "error unmarshaling config: %s", err)
 	}
+	log.Debugf("loaded config: %#v", ac)
 	return nil
+}
+
+func (ac *AppConfig) GetDatabaseConnectionString() string {
+	if ac.dbConnectionString == "" {
+		ac.dbConnectionString = util.ResolveConnectionString(ac.FDWConnection, &ac.FDWConnectionSecret)
+	}
+	return ac.dbConnectionString
 }

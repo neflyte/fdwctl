@@ -64,7 +64,7 @@ func preDoDrop(cmd *cobra.Command, _ []string) error {
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "preDoDrop")
-	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().FDWConnection)
+	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().GetDatabaseConnectionString())
 	if err != nil {
 		return logger.ErrorfAsError(log, "error getting database connection: %s", err)
 	}

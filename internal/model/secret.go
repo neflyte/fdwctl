@@ -1,4 +1,4 @@
-package config
+package model
 
 type SecretK8s struct {
 	Namespace  string `yaml:"namespace" json:"namespace"`
@@ -9,6 +9,6 @@ type SecretK8s struct {
 type Secret struct {
 	Value         string    `yaml:"value,omitempty" json:"value,omitempty"`
 	FromEnv       string    `yaml:"fromEnv,omitempty" json:"fromEnv,omitempty"`
-	FromFile      string    `yaml:"fromFile,omitEmpty" json:"fromFile,omitempty"`
+	FromFile      string    `yaml:"fromFile,omitempty" json:"fromFile,omitempty"`
 	FromK8sSecret SecretK8s `yaml:"fromK8s,omitempty" json:"fromK8s,omitempty"`
 }
