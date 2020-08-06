@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+const (
+	editUserCmdMinArgCount = 2
+)
+
 var (
 	editCmd = &cobra.Command{
 		Use:               "edit",
@@ -29,7 +33,7 @@ var (
 		Use:   "usermap <server name> <local user>",
 		Short: "Edit a user mapping for a foreign server",
 		Run:   editUsermap,
-		Args:  cobra.MinimumNArgs(2),
+		Args:  cobra.MinimumNArgs(editUserCmdMinArgCount),
 	}
 	editServerName     string
 	editServerHost     string
@@ -98,7 +102,7 @@ func editServer(cmd *cobra.Command, args []string) {
 		// TODO: Move this to the `util` package
 		query := fmt.Sprintf("ALTER SERVER %s RENAME TO %s", esServerName, editServerName)
 		log.Tracef("query: %s", query)
-		_, err := dbConnection.Exec(cmd.Context(), query)
+		_, err = dbConnection.Exec(cmd.Context(), query)
 		if err != nil {
 			log.Errorf("error renaming server object: %s", err)
 			return

@@ -59,12 +59,11 @@ func GetUserMapsForServer(ctx context.Context, dbConnection *pgx.Conn, foreignSe
 	return users, nil
 }
 
-func DiffUserMaps(dStateUserMaps []model.UserMap, dbUserMaps []model.UserMap) (umRemove []model.UserMap, umAdd []model.UserMap, umModify []model.UserMap, err error) {
+func DiffUserMaps(dStateUserMaps []model.UserMap, dbUserMaps []model.UserMap) (umRemove []model.UserMap, umAdd []model.UserMap, umModify []model.UserMap) {
 	// Init return variables
 	umRemove = make([]model.UserMap, 0)
 	umAdd = make([]model.UserMap, 0)
 	umModify = make([]model.UserMap, 0)
-	err = nil
 	// umRemove
 	for _, dbUserMap := range dbUserMaps {
 		if FindUserMap(dStateUserMaps, dbUserMap.LocalUser) == nil {

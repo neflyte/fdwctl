@@ -23,7 +23,7 @@ const (
 var (
 	StartsWithNumberRE   = regexp.MustCompile(`^[0-9].*$`)
 	pgConnectionStringRE = regexp.MustCompile(`([\w]+)[ ]?=[ ]?([\w]+)`)
-	urlStringRE          = regexp.MustCompile(`^(postgres[q]?[l]?:\/\/)?([^:\/\s]+)(:([^\/]*))?(\/\w+\.)*([^#?\s]+)(\?([^#]*))?(#(.*))?$`)
+	urlStringRE          = regexp.MustCompile(`^(postgres[q]?[l]?://)?([^:/\s]+)(:([^/]*))?(/\w+\.)*([^#?\s]+)(\?([^#]*))?(#(.*))?$`)
 	pgConnectionFields   = []interface{}{PGConnHost, PGConnPort, PGConnDBName, PGConnUser, PGConnSSLMode}
 )
 

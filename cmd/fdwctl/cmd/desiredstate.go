@@ -60,10 +60,10 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 		return
 	}
 	// Diff servers
-	serversInDBButNotInDState, serversInDStateButNotInDB, serversAlreadyInDB, _ := util.DiffForeignServers(dStateServers, dbServers)
+	serversInDBButNotInDState, serversInDStateButNotInDB, serversAlreadyInDB := util.DiffForeignServers(dStateServers, dbServers)
 	// Remove servers in DB but not in DState
 	for _, serverNotInDState := range serversInDBButNotInDState {
-		err := util.DropServer(cmd.Context(), dbConnection, serverNotInDState.Name, true)
+		err = util.DropServer(cmd.Context(), dbConnection, serverNotInDState.Name, true)
 		if err != nil {
 			log.Errorf("error dropping server %s that is not in desired state: %s", serverNotInDState.Name, err)
 			return
@@ -72,7 +72,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 	}
 	// Create servers that are in DState but not yet in DB
 	for _, serverNotInDB := range serversInDStateButNotInDB {
-		err := util.CreateServer(cmd.Context(), dbConnection, serverNotInDB)
+		err = util.CreateServer(cmd.Context(), dbConnection, serverNotInDB)
 		if err != nil {
 			log.Errorf("error creating server: %s", err)
 			return
@@ -88,7 +88,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 		}
 		dbServer := *dsServer
 		if !dbServer.Equals(serverAlreadyInDB) {
-			err := util.UpdateServer(cmd.Context(), dbConnection, serverAlreadyInDB)
+			err = util.UpdateServer(cmd.Context(), dbConnection, serverAlreadyInDB)
 			if err != nil {
 				log.Errorf("error updating server: %s", err)
 				return
@@ -169,7 +169,7 @@ func applyUserMaps(ctx context.Context, dbConnection *pgx.Conn, server model.For
 	}
 	dStateServerUsermaps := dsServer.UserMaps
 	// Diff usermaps
-	usRemove, usAdd, usModify, _ := util.DiffUserMaps(dStateServerUsermaps, dbServerUsermaps)
+	usRemove, usAdd, usModify := util.DiffUserMaps(dStateServerUsermaps, dbServerUsermaps)
 	// Delete Usermaps not in DState
 	for _, usermapToRemove := range usRemove {
 		usermapToRemove.ServerName = dsServer.Name

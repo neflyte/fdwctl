@@ -10,6 +10,10 @@ import (
 	"strings"
 )
 
+const (
+	dropServerCmdMinArgCount = 2
+)
+
 var (
 	dropCmd = &cobra.Command{
 		Use:               "drop",
@@ -32,7 +36,7 @@ var (
 		Use:   "usermap <server name> <local user>",
 		Short: "Drop a user mapping for a foreign server",
 		Run:   dropUsermap,
-		Args:  cobra.MinimumNArgs(2),
+		Args:  cobra.MinimumNArgs(dropServerCmdMinArgCount),
 	}
 	dropSchemaCmd = &cobra.Command{
 		Use:   "schema <schema name>",
@@ -87,7 +91,7 @@ func dropExtension(cmd *cobra.Command, _ []string) {
 		log.Errorf("error dropping extension %s: %s", dropExtName, err)
 		return
 	}
-	log.Info("extension %s dropped", dropExtName)
+	log.Infof("extension %s dropped", dropExtName)
 }
 
 func dropServer(cmd *cobra.Command, args []string) {

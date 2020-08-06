@@ -128,12 +128,11 @@ func UpdateServer(ctx context.Context, dbConnection *pgx.Conn, server model.Fore
 }
 
 // DiffForeignServers produces a list of `ForeignServers` to remove, add, and modify to bring `dbServers` in line with `dStateServers`
-func DiffForeignServers(dStateServers []model.ForeignServer, dbServers []model.ForeignServer) (fsRemove []model.ForeignServer, fsAdd []model.ForeignServer, fsModify []model.ForeignServer, err error) {
+func DiffForeignServers(dStateServers []model.ForeignServer, dbServers []model.ForeignServer) (fsRemove []model.ForeignServer, fsAdd []model.ForeignServer, fsModify []model.ForeignServer) {
 	// Init return variables
 	fsRemove = make([]model.ForeignServer, 0)
 	fsAdd = make([]model.ForeignServer, 0)
 	fsModify = make([]model.ForeignServer, 0)
-	err = nil
 	// fsRemove
 	for _, dbServer := range dbServers {
 		if FindForeignServer(dStateServers, dbServer.Name) == nil {

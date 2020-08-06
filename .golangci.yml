@@ -1,0 +1,39 @@
+# golangci-lint configuration
+#
+linters:
+  disable-all: true
+  enable:
+    - deadcode
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unused
+    - varcheck
+    - bodyclose
+    - dogsled
+    - gomnd
+    - gosec
+    - maligned
+    - misspell
+    - rowserrcheck
+    - scopelint
+    - unconvert
+    - unparam
+    - whitespace
+linters-settings:
+  gomnd:
+    settings:
+      mnd:
+        checks: argument,case,condition,return
+  govet:
+    check-shadowing: true
+  maligned:
+    suggest-new: true
+  unparam:
+    check-exported: true
+  unused:
+    check-exported: false

@@ -47,7 +47,7 @@ func EnsureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string
 	}
 	if !localSchemaExists {
 		log.Debug("schema does not exist; creating")
-		query := fmt.Sprintf("CREATE SCHEMA %s", schemaName)
+		query = fmt.Sprintf("CREATE SCHEMA %s", schemaName)
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(ctx, query)
 		if err != nil {
@@ -293,7 +293,8 @@ func ImportSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model
 			log.Debugf("local enum %s exists", remoteEnum)
 			continue
 		}
-		enumStrings, err := GetEnumStrings(ctx, fdbConn, remoteEnum)
+		var enumStrings []string
+		enumStrings, err = GetEnumStrings(ctx, fdbConn, remoteEnum)
 		if err != nil {
 			log.Errorf("error getting enum values: %s", err)
 			return err
