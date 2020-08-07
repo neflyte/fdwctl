@@ -22,9 +22,10 @@ var (
 		PersistentPostRun: postDoDrop,
 	}
 	dropExtensionCmd = &cobra.Command{
-		Use:   "extension",
+		Use:   "extension <extension name>",
 		Short: "Drop a PG extension (usually postgres_fdw)",
 		Run:   dropExtension,
+		Args:  cobra.MinimumNArgs(1),
 	}
 	dropServerCmd = &cobra.Command{
 		Use:   "server <server name>",
@@ -46,13 +47,9 @@ var (
 	}
 	cascadeDrop   bool
 	dropLocalUser bool
-	dropExtName   string
 )
 
 func init() {
-	dropExtensionCmd.Flags().StringVar(&dropExtName, "extname", "postgres_fdw", "name of the PG extension to drop")
-	_ = dropExtensionCmd.MarkFlagRequired("extname")
-
 	dropUsermapCmd.Flags().BoolVar(&dropLocalUser, "droplocal", false, "also drop the local USER object")
 
 	dropCmd.PersistentFlags().BoolVar(&cascadeDrop, "cascade", false, "drop objects with CASCADE option")
@@ -79,11 +76,12 @@ func postDoDrop(cmd *cobra.Command, _ []string) {
 	database.CloseConnection(cmd.Context(), dbConnection)
 }
 
-func dropExtension(cmd *cobra.Command, _ []string) {
+func dropExtension(cmd *cobra.Command, args []string) {
 	log := logger.
 		Root().
 		WithContext(cmd.Context()).
 		WithField("function", "dropExtension")
+	dropExtName := strings.TrimSpace(args[0])
 	err := util.DropExtension(cmd.Context(), dbConnection, model.Extension{
 		Name: dropExtName,
 	})

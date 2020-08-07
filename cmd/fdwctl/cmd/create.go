@@ -20,14 +20,16 @@ var (
 		PersistentPostRun: postDoCreate,
 	}
 	createServerCmd = &cobra.Command{
-		Use:   "server",
+		Use:   "server <server name>",
 		Short: "Create a foreign server",
 		Run:   createServer,
+		Args:  cobra.MinimumNArgs(1),
 	}
 	createExtensionCmd = &cobra.Command{
-		Use:   "extension",
+		Use:   "extension <extension name>",
 		Short: "Create a PG extension (usually postgres_fdw)",
 		Run:   createExtension,
+		Args:  cobra.MinimumNArgs(1),
 	}
 	createUsermapCmd = &cobra.Command{
 		Use:   "usermap",
@@ -51,20 +53,15 @@ var (
 	csServerName         string
 	importEnums          bool
 	importEnumConnection string
-	extName              string
 )
 
 func init() {
 	createServerCmd.Flags().StringVar(&serverHost, "serverhost", "", "hostname of the remote PG server")
 	createServerCmd.Flags().StringVar(&serverPort, "serverport", "5432", "port of the remote PG server")
 	createServerCmd.Flags().StringVar(&serverDBName, "serverdbname", "", "database name on remote PG server")
-	createServerCmd.Flags().StringVar(&csServerName, "servername", "", "foerign server name (optional)")
 	_ = createServerCmd.MarkFlagRequired("serverhost")
 	_ = createServerCmd.MarkFlagRequired("serverport")
 	_ = createServerCmd.MarkFlagRequired("serverdbname")
-
-	createExtensionCmd.Flags().StringVar(&extName, "extname", "postgres_fdw", "name of the extension to create")
-	_ = createExtensionCmd.MarkFlagRequired("extname")
 
 	createUsermapCmd.Flags().StringVar(&serverName, "servername", "", "foreign server name")
 	createUsermapCmd.Flags().StringVar(&localUser, "localuser", "", "local user name")
@@ -107,25 +104,26 @@ func postDoCreate(cmd *cobra.Command, _ []string) {
 	database.CloseConnection(cmd.Context(), dbConnection)
 }
 
-func createExtension(cmd *cobra.Command, _ []string) {
+func createExtension(cmd *cobra.Command, args []string) {
 	log := logger.Root().
 		WithContext(cmd.Context()).
 		WithField("function", "createExtension")
+	extName := strings.TrimSpace(args[0])
 	err := util.CreateExtension(cmd.Context(), dbConnection, model.Extension{
-		Name: "postgres_fdw",
+		Name: extName,
 	})
 	if err != nil {
-		log.Errorf("error creating postgres_fdw extension: %s", err)
+		log.Errorf("error creating extension %s: %s", extName, err)
 		return
 	}
-	log.Info("extension postgres_fdw created")
+	log.Infof("extension %s created", extName)
 }
 
-func createServer(cmd *cobra.Command, _ []string) {
+func createServer(cmd *cobra.Command, args []string) {
 	log := logger.Root().
 		WithContext(cmd.Context()).
 		WithField("function", "createServer")
-	serverSlug := csServerName
+	serverSlug := strings.TrimSpace(args[0])
 	if serverSlug == "" {
 		hostSlug := strings.Replace(serverHost, ".", "_", -1)
 		serverSlug = fmt.Sprintf("%s_%s_%s", hostSlug, serverPort, serverDBName)

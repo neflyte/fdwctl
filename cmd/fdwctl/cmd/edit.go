@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -86,12 +85,13 @@ func editServer(cmd *cobra.Command, args []string) {
 		log.Errorf("error converting port to integer: %s", err)
 		return
 	}
-	err = util.UpdateServer(cmd.Context(), dbConnection, model.ForeignServer{
+	fServer := model.ForeignServer{
 		Name: esServerName,
 		Host: editServerHost,
 		Port: portInt,
 		DB:   editServerDBName,
-	})
+	}
+	err = util.UpdateServer(cmd.Context(), dbConnection, fServer)
 	if err != nil {
 		log.Errorf("error editing server: %s", err)
 		return
@@ -99,12 +99,9 @@ func editServer(cmd *cobra.Command, args []string) {
 	log.Infof("server %s edited", esServerName)
 	// Rename server entry
 	if editServerName != "" {
-		// TODO: Move this to the `util` package
-		query := fmt.Sprintf("ALTER SERVER %s RENAME TO %s", esServerName, editServerName)
-		log.Tracef("query: %s", query)
-		_, err = dbConnection.Exec(cmd.Context(), query)
+		err = util.UpdateServerName(cmd.Context(), dbConnection, fServer, editServerName)
 		if err != nil {
-			log.Errorf("error renaming server object: %s", err)
+			log.Errorf("error renaming foreign server: %s", err)
 			return
 		}
 		log.Infof("server %s renamed to %s", esServerName, editServerName)

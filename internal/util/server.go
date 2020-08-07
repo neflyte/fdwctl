@@ -127,6 +127,20 @@ func UpdateServer(ctx context.Context, dbConnection *pgx.Conn, server model.Fore
 	return nil
 }
 
+func UpdateServerName(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer, newServerName string) error {
+	log := logger.Root().
+		WithContext(ctx).
+		WithField("function", "UpdateServerName")
+	query := fmt.Sprintf("ALTER SERVER %s RENAME TO %s", server.Name, newServerName)
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.Exec(ctx, query)
+	if err != nil {
+		log.Errorf("error renaming server object: %s", err)
+		return err
+	}
+	return nil
+}
+
 // DiffForeignServers produces a list of `ForeignServers` to remove, add, and modify to bring `dbServers` in line with `dStateServers`
 func DiffForeignServers(dStateServers []model.ForeignServer, dbServers []model.ForeignServer) (fsRemove []model.ForeignServer, fsAdd []model.ForeignServer, fsModify []model.ForeignServer) {
 	// Init return variables
