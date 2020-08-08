@@ -341,7 +341,7 @@ func ImportSchema(ctx context.Context, dbConnection *pgx.Conn, serverName string
 		}
 	}
 	// TODO: support LIMIT TO and EXCEPT
-	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", schema.RemoteSchema, serverName, schema.LocalSchema) //nolint:gosec
+	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", schema.RemoteSchema, serverName, schema.LocalSchema)
 	log.Tracef("query: %s", query)
 	_, err = dbConnection.Exec(ctx, query)
 	if err != nil {

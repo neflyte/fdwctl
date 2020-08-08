@@ -115,3 +115,18 @@ func ResolveConnectionString(connStr string, secret *model.Secret) string {
 	}
 	return connURL.String()
 }
+
+// SanitizedURLString returns a parsed URL string with user credentials removed
+func SanitizedURLString(urlWithCreds string) string {
+	log := logger.Root().
+		WithField("function", "SanitizedURLString")
+	clone, err := url.Parse(urlWithCreds)
+	if err != nil {
+		log.Errorf("unable to clone url: %s", err)
+		return urlWithCreds
+	}
+	if clone.User != nil {
+		clone.User = url.User(clone.User.Username())
+	}
+	return clone.String()
+}

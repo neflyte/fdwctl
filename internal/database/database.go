@@ -2,23 +2,10 @@ package database
 
 import (
 	"context"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/sirupsen/logrus"
+	"github.com/neflyte/fdwctl/internal/util"
 )
-
-var (
-	pgNoticeLogger logrus.FieldLogger
-)
-
-func init() {
-	pgNoticeLogger = logger.Root().WithField("pgx", "NOTICE")
-}
-
-func pgNoticeHandler(_ *pgconn.PgConn, notice *pgconn.Notice) {
-	pgNoticeLogger.Warnf("[%s] %s", notice.Code, notice.Message)
-}
 
 func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, error) {
 	log := logger.Root().
@@ -27,19 +14,16 @@ func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, err
 	if connectionString == "" {
 		return nil, logger.ErrorfAsError(log, "database connection string is required")
 	}
-	log.Debugf("opening database connection to %s", connectionString)
+	log.Debugf("opening database connection to %s", util.SanitizedURLString(connectionString))
 	conn, err := pgx.Connect(ctx, connectionString)
-	if err == nil {
-		conn.Config().OnNotice = pgNoticeHandler
-	} else {
-		log.Debugf("error connecting to database: %s", err)
+	if err != nil {
+		return nil, logger.ErrorfAsError(log, "error connecting to database: %s", err)
 	}
 	return conn, err
 }
 
 func CloseConnection(ctx context.Context, conn *pgx.Conn) {
-	log := logger.
-		Root().
+	log := logger.Root().
 		WithContext(ctx).
 		WithField("function", "CloseConnection")
 	if conn != nil && !conn.IsClosed() {
