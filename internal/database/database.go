@@ -1,3 +1,6 @@
+/*
+Package database handles database connection operations
+*/
 package database
 
 import (
@@ -7,6 +10,7 @@ import (
 	"github.com/neflyte/fdwctl/internal/util"
 )
 
+// GetConnection returns an established connection to a database using the supplied connection string
 func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, error) {
 	log := logger.Root().
 		WithContext(ctx).
@@ -22,6 +26,7 @@ func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, err
 	return conn, err
 }
 
+// CloseConnection closes a database connection and logs any resulting errors
 func CloseConnection(ctx context.Context, conn *pgx.Conn) {
 	log := logger.Root().
 		WithContext(ctx).

@@ -1,3 +1,6 @@
+/*
+Package logger handles application logging
+*/
 package logger
 
 import (
@@ -8,63 +11,76 @@ import (
 )
 
 const (
+	// TraceLevel represents the TRACE logging level
 	TraceLevel = "trace"
+	// DebugLevel represents the DEBUG logging level
 	DebugLevel = "debug"
-	InfoLevel  = "info"
-	WarnLevel  = "warn"
+	// InfoLevel represents the INFO logging level
+	InfoLevel = "info"
+	// WarnLevel represents the WARN logging level
+	WarnLevel = "warn"
+	// ErrorLevel represents the ERROR logging level
 	ErrorLevel = "error"
+	// FatalLevel represents the FATAL logging level
 	FatalLevel = "fatal"
+	// PanicLevel represents the PANIC logging level
 	PanicLevel = "panic"
+
+	// JSONFormat represents the JSON logging format
 	JSONFormat = "json"
+	// TextFormat represents the text logging format
 	TextFormat = "text"
 )
 
 var (
+	// rootLogger is the singleton application logger
 	rootLogger *logrus.Logger
 )
 
-func init() {
-	rootLogger = logrus.StandardLogger()
-	rootLogger.SetLevel(logrus.DebugLevel)
-}
-
+// SetFormat configures the logger message format
 func SetFormat(format string) {
 	formatStr := strings.TrimSpace(strings.ToLower(format))
 	switch formatStr {
 	case JSONFormat:
-		rootLogger.SetFormatter(&logrus.JSONFormatter{})
+		Root().SetFormatter(&logrus.JSONFormatter{})
 	case TextFormat:
-		rootLogger.SetFormatter(&logrus.TextFormatter{
+		Root().SetFormatter(&logrus.TextFormatter{
 			FullTimestamp: true,
 		})
 	default:
-		rootLogger.WithField("function", "SetFormat").Errorf("unknown format: %s", formatStr)
+		Root().WithField("function", "SetFormat").Errorf("unknown format: %s", formatStr)
 	}
 }
 
+// SetLevel configures the logger logging level
 func SetLevel(level string) {
 	levelStr := strings.TrimSpace(strings.ToLower(level))
 	switch levelStr {
 	case TraceLevel:
-		rootLogger.SetLevel(logrus.TraceLevel)
+		Root().SetLevel(logrus.TraceLevel)
 	case DebugLevel:
-		rootLogger.SetLevel(logrus.DebugLevel)
+		Root().SetLevel(logrus.DebugLevel)
 	case InfoLevel:
-		rootLogger.SetLevel(logrus.InfoLevel)
+		Root().SetLevel(logrus.InfoLevel)
 	case WarnLevel:
-		rootLogger.SetLevel(logrus.WarnLevel)
+		Root().SetLevel(logrus.WarnLevel)
 	case ErrorLevel:
-		rootLogger.SetLevel(logrus.ErrorLevel)
+		Root().SetLevel(logrus.ErrorLevel)
 	case FatalLevel:
-		rootLogger.SetLevel(logrus.FatalLevel)
+		Root().SetLevel(logrus.FatalLevel)
 	case PanicLevel:
-		rootLogger.SetLevel(logrus.PanicLevel)
+		Root().SetLevel(logrus.PanicLevel)
 	default:
-		rootLogger.WithField("function", "SetLevel").Errorf("unknown level: %s", level)
+		Root().WithField("function", "SetLevel").Errorf("unknown level: %s", level)
 	}
 }
 
+// Root returns the singleton application logger
 func Root() *logrus.Logger {
+	if rootLogger == nil {
+		rootLogger = logrus.StandardLogger()
+		rootLogger.SetLevel(logrus.DebugLevel)
+	}
 	return rootLogger
 }
 

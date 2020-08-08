@@ -1,3 +1,6 @@
+/*
+Package config contains data structures and methods for handling application configuration
+*/
 package config
 
 import (
@@ -12,41 +15,45 @@ import (
 	"strings"
 )
 
+// appConfig is the application configuration structure. Configuration files are unmarshaled into it directly.
+type appConfig struct {
+	// FDWConnection is the Postgres database connection string for the FDW database
+	FDWConnection string `yaml:"FDWConnection" json:"FDWConnection"`
+	// FDWConnectionSecret configures how to retrieve the optional credential for the FDWConnection connection string
+	FDWConnectionSecret model.Secret `yaml:"FDWConnectionSecret,omitempty" json:"FDWConnectionSecret,omitempty"`
+	// DesiredState defines the desired state configuration of the FDW database
+	DesiredState model.DesiredState `yaml:"DesiredState,omitempty" json:"DesiredState,omitempty"`
+	// dbConnectionString is the calculated connection string for the FDW database
+	dbConnectionString string
+}
+
 const (
-	FileName        = "config.yaml"
-	XDGAppConfigDir = "fdwctl"
+	// fileName is the default configuration file name
+	fileName = "config.yaml"
+	// xdgAppConfigDir is the subdirectory of XDG_CONFIG_HOME that the configuration file lives in
+	xdgAppConfigDir = "fdwctl"
 )
 
 var (
-	instance AppConfig
+	// configInstance is the singleton instance of the application configuration
+	configInstance *appConfig
 )
 
-type DesiredState struct {
-	Extensions []model.Extension     `yaml:"Extensions,omitempty" json:"Extensions,omitempty"`
-	Servers    []model.ForeignServer `yaml:"Servers,omitempty" json:"Servers,omitempty"`
-}
-
-type AppConfig struct {
-	FDWConnection       string       `yaml:"FDWConnection" json:"FDWConnection"`
-	FDWConnectionSecret model.Secret `yaml:"FDWConnectionSecret,omitempty" json:"FDWConnectionSecret,omitempty"`
-	DesiredState        DesiredState `yaml:"DesiredState,omitempty" json:"DesiredState,omitempty"`
-	dbConnectionString  string
-}
-
-func init() {
-	instance = AppConfig{
-		FDWConnectionSecret: model.Secret{},
-		DesiredState: DesiredState{
-			Extensions: make([]model.Extension, 0),
-			Servers:    make([]model.ForeignServer, 0),
-		},
+// Instance returns the singleton instance of the application configuration
+func Instance() *appConfig {
+	if configInstance == nil {
+		configInstance = &appConfig{
+			FDWConnectionSecret: model.Secret{},
+			DesiredState: model.DesiredState{
+				Extensions: make([]model.Extension, 0),
+				Servers:    make([]model.ForeignServer, 0),
+			},
+		}
 	}
+	return configInstance
 }
 
-func Instance() *AppConfig {
-	return &instance
-}
-
+// UserConfigFile returns the resolved path and filename of the application configuration file
 func UserConfigFile() string {
 	log := logger.Root().
 		WithField("function", "UserConfigFile")
@@ -56,7 +63,8 @@ func UserConfigFile() string {
 		xdgConfigHome = ""
 	}
 	if xdgConfigHome == "" {
-		homedir, err := os.UserHomeDir()
+		homedir := ""
+		homedir, err = os.UserHomeDir()
 		if err != nil {
 			log.Errorf("error getting user home directory: %s", err)
 		}
@@ -66,10 +74,11 @@ func UserConfigFile() string {
 			xdgConfigHome = "."
 		}
 	}
-	return path.Join(xdgConfigHome, XDGAppConfigDir, FileName)
+	return path.Join(xdgConfigHome, xdgAppConfigDir, fileName)
 }
 
-func Load(ac *AppConfig, fileName string) error {
+// Load reads the specified file into the application configuration struct
+func Load(ac *appConfig, fileName string) error {
 	log := logger.Root().
 		WithField("function", "Load")
 	fs := afero.NewOsFs()
@@ -85,7 +94,6 @@ func Load(ac *AppConfig, fileName string) error {
 	if err != nil {
 		return logger.ErrorfAsError(log, "error reading config file: %s", err)
 	}
-	// log.Tracef("rawConfigBytes: %s", rawConfigBytes)
 	if strings.HasSuffix(fileName, "json") {
 		err = json.Unmarshal(rawConfigBytes, ac)
 	} else {
@@ -98,7 +106,8 @@ func Load(ac *AppConfig, fileName string) error {
 	return nil
 }
 
-func (ac *AppConfig) GetDatabaseConnectionString() string {
+// GetDatabaseConnectionString returns the calculated connection string for the FDW database
+func (ac *appConfig) GetDatabaseConnectionString() string {
 	if ac.dbConnectionString == "" {
 		ac.dbConnectionString = util.ResolveConnectionString(ac.FDWConnection, &ac.FDWConnectionSecret)
 	}
