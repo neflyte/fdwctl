@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"net/url"
 	"strings"
 )
 
@@ -91,4 +92,19 @@ func ErrorfAsError(log logrus.FieldLogger, format string, args ...interface{}) e
 	message := fmt.Sprintf(format, args...)
 	log.Error(message)
 	return errors.New(message)
+}
+
+// SanitizedURLString returns a parsed URL string with user credentials removed
+func SanitizedURLString(urlWithCreds string) string {
+	log := Root().
+		WithField("function", "SanitizedURLString")
+	clone, err := url.Parse(urlWithCreds)
+	if err != nil {
+		log.Errorf("unable to clone url: %s", err)
+		return urlWithCreds
+	}
+	if clone.User != nil {
+		clone.User = url.User(clone.User.Username())
+	}
+	return clone.String()
 }

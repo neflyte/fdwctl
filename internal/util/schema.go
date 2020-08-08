@@ -12,10 +12,11 @@ import (
 	"strings"
 )
 
-func EnsureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string) error {
+// ensureSchema verifies that a schema with the supplied name exists and if it does not then it will be created
+func ensureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string) error {
 	log := logger.Root().
 		WithContext(ctx).
-		WithField("function", "EnsureSchema")
+		WithField("function", "ensureSchema")
 	query, args, err := sqrl.
 		Select("1").
 		From("information_schema.schemata").
@@ -61,10 +62,12 @@ func EnsureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string
 	return nil
 }
 
-func GetEnums(ctx context.Context, dbConnection *pgx.Conn) ([]string, error) {
+// getEnums returns a list of ENUM types
+func getEnums(ctx context.Context, dbConnection *pgx.Conn) ([]string, error) {
+	// FIXME: Doesn't this need to be constrained to a particular schema?
 	log := logger.Root().
 		WithContext(ctx).
-		WithField("function", "GetEnums")
+		WithField("function", "getEnums")
 	query, args, err := sqrl.
 		Select("typname").
 		From("pg_type").
@@ -95,10 +98,11 @@ func GetEnums(ctx context.Context, dbConnection *pgx.Conn) ([]string, error) {
 	return enums, nil
 }
 
-func GetSchemaEnumsUsedInTables(ctx context.Context, dbConnection *pgx.Conn, schemaName string) ([]string, error) {
+// getSchemaEnumsUsedInTables returns a list of ENUM types that are used in tables of the specified schema
+func getSchemaEnumsUsedInTables(ctx context.Context, dbConnection *pgx.Conn, schemaName string) ([]string, error) {
 	log := logger.Root().
 		WithContext(ctx).
-		WithField("function", "GetSchemaEnumsUsedInTables")
+		WithField("function", "getSchemaEnumsUsedInTables")
 	query, args, err := sqrl.
 		Select("cuu.udt_name").
 		From("information_schema.column_udt_usage cuu").
@@ -133,10 +137,11 @@ func GetSchemaEnumsUsedInTables(ctx context.Context, dbConnection *pgx.Conn, sch
 	return enums, nil
 }
 
-func GetEnumStrings(ctx context.Context, dbConnection *pgx.Conn, enumType string) ([]string, error) {
+// getEnumStrings returns a list of string entries from the specified ENUM type
+func getEnumStrings(ctx context.Context, dbConnection *pgx.Conn, enumType string) ([]string, error) {
 	log := logger.Root().
 		WithContext(ctx).
-		WithField("function", "GetEnumStrings")
+		WithField("function", "getEnumStrings")
 	query, args, err := sqrl.
 		Select("e.enumlabel").
 		From("pg_type t").
@@ -169,6 +174,7 @@ func GetEnumStrings(ctx context.Context, dbConnection *pgx.Conn, enumType string
 	return enumStrings, nil
 }
 
+// GetSchemas returns a list of foreign schemas
 func GetSchemas(ctx context.Context, dbConnection *pgx.Conn) ([]model.Schema, error) {
 	log := logger.Root().
 		WithContext(ctx).
@@ -207,6 +213,9 @@ func GetSchemas(ctx context.Context, dbConnection *pgx.Conn) ([]model.Schema, er
 	return schemas, nil
 }
 
+// DiffSchemas takes two lists of schemas and produces a list of schemas that migrate the second list (dbSchemas)
+// to equal the first (dStateSchemas). The first list (dStateSchemas) is the desired state; the second list (dbSchemas) is the
+// current state. A list of schemas to remove, schemas to add, and schemas to modify are returned.
 func DiffSchemas(dStateSchemas []model.Schema, dbSchemas []model.Schema) (schRemove []model.Schema, schAdd []model.Schema, schModify []model.Schema) {
 	schRemove = make([]model.Schema, 0)
 	schAdd = make([]model.Schema, 0)
@@ -242,6 +251,7 @@ func DiffSchemas(dStateSchemas []model.Schema, dbSchemas []model.Schema) (schRem
 	return
 }
 
+// DropSchema drops a database schema with optional CASCADE
 func DropSchema(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema, cascadeDrop bool) error {
 	// TODO: Figure out if it's feasible to also drop the foreign ENUMs as well to make the drop as clean as possible
 	log := logger.Root().
@@ -263,10 +273,11 @@ func DropSchema(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema
 	return nil
 }
 
-func ImportSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema) error {
+// importSchemaEnums attempts to create ENUM types locally that represent ENUM types used in the remote schema
+func importSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema) error {
 	log := logger.Root().
 		WithContext(ctx).
-		WithField("function", "ImportSchemaEnums")
+		WithField("function", "importSchemaEnums")
 	fdbConnStr := ResolveConnectionString(schema.ENUMConnection, &schema.ENUMSecret)
 	fdbConn, err := database.GetConnection(ctx, fdbConnStr)
 	if err != nil {
@@ -274,14 +285,14 @@ func ImportSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model
 		return err
 	}
 	defer database.CloseConnection(ctx, fdbConn)
-	remoteEnums, err := GetSchemaEnumsUsedInTables(ctx, fdbConn, schema.RemoteSchema)
+	remoteEnums, err := getSchemaEnumsUsedInTables(ctx, fdbConn, schema.RemoteSchema)
 	if err != nil {
 		log.Errorf("error getting remote ENUMs: %s", err)
 		return err
 	}
 	sort.Strings(remoteEnums)
 	// Get a list of local enums, too
-	localEnums, err := GetEnums(ctx, dbConnection)
+	localEnums, err := getEnums(ctx, dbConnection)
 	if err != nil {
 		log.Errorf("error getting local ENUMs: %s", err)
 		return err
@@ -294,7 +305,7 @@ func ImportSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model
 			continue
 		}
 		var enumStrings []string
-		enumStrings, err = GetEnumStrings(ctx, fdbConn, remoteEnum)
+		enumStrings, err = getEnumStrings(ctx, fdbConn, remoteEnum)
 		if err != nil {
 			log.Errorf("error getting enum values: %s", err)
 			return err
@@ -316,6 +327,8 @@ func ImportSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model
 	return nil
 }
 
+// ImportSchema attempts to import a remote schema from a foreign server into a local schema, optionally importing
+// ENUM types used in the remote schema as well.
 func ImportSchema(ctx context.Context, dbConnection *pgx.Conn, serverName string, schema model.Schema) error {
 	log := logger.Root().
 		WithContext(ctx).
@@ -328,22 +341,28 @@ func ImportSchema(ctx context.Context, dbConnection *pgx.Conn, serverName string
 		return logger.ErrorfAsError(log, "enum database connection string is required when importing enums")
 	}
 	// Ensure the local schema exists
-	err := EnsureSchema(ctx, dbConnection, schema.LocalSchema)
+	err := ensureSchema(ctx, dbConnection, schema.LocalSchema)
 	if err != nil {
 		log.Errorf("error ensuring local schema exists: %s", err)
 		return err
 	}
 	if schema.ImportENUMs {
-		err = ImportSchemaEnums(ctx, dbConnection, schema)
+		err = importSchemaEnums(ctx, dbConnection, schema)
 		if err != nil {
 			log.Errorf("error importing foreign enums: %s", err)
 			return err
 		}
 	}
 	// TODO: support LIMIT TO and EXCEPT
-	query := fmt.Sprintf("IMPORT FOREIGN SCHEMA %s FROM SERVER %s INTO %s", schema.RemoteSchema, serverName, schema.LocalSchema)
-	log.Tracef("query: %s", query)
-	_, err = dbConnection.Exec(ctx, query)
+	sb := new(strings.Builder)
+	sb.WriteString("IMPORT FOREIGN SCHEMA ")
+	sb.WriteString(schema.RemoteSchema)
+	sb.WriteString(" FROM SERVER ")
+	sb.WriteString(serverName)
+	sb.WriteString(" INTO ")
+	sb.WriteString(schema.LocalSchema)
+	log.Tracef("query: %s", sb.String())
+	_, err = dbConnection.Exec(ctx, sb.String())
 	if err != nil {
 		log.Errorf("error importing foreign schema: %s", err)
 		return err

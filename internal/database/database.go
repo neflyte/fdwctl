@@ -7,7 +7,6 @@ import (
 	"context"
 	"github.com/jackc/pgx/v4"
 	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/util"
 )
 
 // GetConnection returns an established connection to a database using the supplied connection string
@@ -18,7 +17,7 @@ func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, err
 	if connectionString == "" {
 		return nil, logger.ErrorfAsError(log, "database connection string is required")
 	}
-	log.Debugf("opening database connection to %s", util.SanitizedURLString(connectionString))
+	log.Debugf("opening database connection to %s", logger.SanitizedURLString(connectionString))
 	conn, err := pgx.Connect(ctx, connectionString)
 	if err != nil {
 		return nil, logger.ErrorfAsError(log, "error connecting to database: %s", err)

@@ -63,7 +63,7 @@ func mapContainsKeys(haystack configmap.ConfigMap, needles []interface{}) bool {
 // connectionStringWithSecret returns a URL populated with a credential obtained using the supplied secret configuration
 func connectionStringWithSecret(connURL *url.URL, secret model.Secret) string {
 	log := logger.Root().
-		WithField("function", "ConnectionStringWithSecret")
+		WithField("function", "connectionStringWithSecret")
 	secretValue, err := GetSecret(context.Background(), secret)
 	if err != nil {
 		log.Errorf("error getting secret value: %s; returning connection string as-is", err)
@@ -132,19 +132,4 @@ func ResolveConnectionString(connStr string, secret *model.Secret) string {
 		return connectionStringWithSecret(connURL, *secret)
 	}
 	return connURL.String()
-}
-
-// SanitizedURLString returns a parsed URL string with user credentials removed
-func SanitizedURLString(urlWithCreds string) string {
-	log := logger.Root().
-		WithField("function", "SanitizedURLString")
-	clone, err := url.Parse(urlWithCreds)
-	if err != nil {
-		log.Errorf("unable to clone url: %s", err)
-		return urlWithCreds
-	}
-	if clone.User != nil {
-		clone.User = url.User(clone.User.Username())
-	}
-	return clone.String()
 }

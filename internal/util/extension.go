@@ -46,7 +46,7 @@ func GetExtensions(ctx context.Context, dbConnection *pgx.Conn) ([]model.Extensi
 
 // DiffExtensions takes two lists of extensions and produces a list of extensions that migrate the second list (dbExts)
 // to equal the first (dStateExts). The first list (dStateExts) is the desired state; the second list (dbExts) is the
-// current state. A list of extentions to remove and extentions to add are returned.
+// current state. A list of extensions to remove and extensions to add are returned.
 func DiffExtensions(dStateExts []model.Extension, dbExts []model.Extension) (extRemove []model.Extension, extAdd []model.Extension) {
 	extRemove = make([]model.Extension, 0)
 	extAdd = make([]model.Extension, 0)
