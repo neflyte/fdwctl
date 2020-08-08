@@ -1,6 +1,11 @@
-# fdwctl
+# ![fdwctl](media/fdwctl.svg)
 A PostgreSQL Foreign Data Wrapper (FDW) management CLI
+-
 
+![Golang v1.14+](https://img.shields.io/badge/Golang-v1.14+-blue?style=for-the-badge&logo=go&color=00add8&link=https://golang.org)
+![PostgreSQL v9.6+](https://img.shields.io/badge/PostgreSQL-v9.6+-blue?style=for-the-badge&logo=postgresql&color=336791&link=https://postgresql.org)
+
+[Features](#features) | [Installation](#installation) | [Usage](#usage) | [Configuration](#configuration)
 
 ### What is it?
 
@@ -18,6 +23,14 @@ The CLI interface is written with the original intention of being used as part o
 - Can apply a desired configuration state to a database
 - Single, statically-linked binary; can be compiled on any platform supporting Golang 1.14+
 - Multiple log message formats (Text, JSON; Elasticstack schema support is pending)
+
+### Installation
+
+#### Using Go
+
+```shell script
+go install https://github.com/neflyte/fdwctl/cmd/fdwctl
+```
 
 ### Usage
 
@@ -44,9 +57,33 @@ Flags:
 Use "fdwctl [command] --help" for more information about a command.
 ```
 
-### Example Configuration
+#### Examples
 
-The following is an example of the application configuration file in YAML format. The equivalent in JSON format is also supported.
+##### Create the `postgres_fdw` extension
+
+```shell script
+fdwctl create extension postgres_fdw
+```
+
+##### Create a foreign server
+
+```shell script
+fdwctl create server my-remotedb --serverhost remotedb1 --serverport 5432 --serverdbname remotedb
+```
+
+##### Create a user mapping
+
+```shell script
+fdwctl create usermap --servername my-remotedb --localuser fdw --remoteuser remoteuser --remotepassword 'r3m0TE!'
+```
+
+### Configuration
+
+The application configuration file is in YAML format and is located at `${HOME}/.config/fdwctl/config.yaml`. An explicit configuration file can be specified by using the `--config` argument. In addition to YAML, JSON format is also supported.
+
+#### Example Configuration File
+
+The following is an example of the application configuration file in YAML format.
 
 ```yaml
 FDWConnection: "host=localhost port=5432 dbname=fdw user=fdw sslmode=disable"
