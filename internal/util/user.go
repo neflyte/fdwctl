@@ -9,8 +9,7 @@ import (
 )
 
 func EnsureUser(ctx context.Context, dbConnection *pgx.Conn, userName string, userPassword string) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "EnsureUser")
 	query, args, err := sqrl.Select("1").
 		From("pg_user").
@@ -53,8 +52,7 @@ func EnsureUser(ctx context.Context, dbConnection *pgx.Conn, userName string, us
 }
 
 func DropUser(ctx context.Context, dbConnection *pgx.Conn, username string) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "DropUser")
 	if username == "" {
 		return logger.ErrorfAsError(log, "user name is required")

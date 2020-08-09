@@ -55,9 +55,7 @@ func init() {
 
 func preDoEdit(cmd *cobra.Command, _ []string) error {
 	var err error
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "preDoEdit")
 	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().GetDatabaseConnectionString())
 	if err != nil {
@@ -71,9 +69,7 @@ func postDoEdit(cmd *cobra.Command, _ []string) {
 }
 
 func editServer(cmd *cobra.Command, args []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "editServer")
 	esServerName := strings.TrimSpace(args[0])
 	if esServerName == "" {
@@ -109,9 +105,7 @@ func editServer(cmd *cobra.Command, args []string) {
 }
 
 func editUsermap(cmd *cobra.Command, args []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "editServer")
 	euServerName := strings.TrimSpace(args[0])
 	if euServerName == "" {

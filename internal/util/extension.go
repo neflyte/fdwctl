@@ -11,8 +11,7 @@ import (
 
 // GetExtensions returns a list of installed extensions
 func GetExtensions(ctx context.Context, dbConnection *pgx.Conn) ([]model.Extension, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "GetExtensions")
 	exts := make([]model.Extension, 0)
 	query, _, err := sqrl.
@@ -81,8 +80,7 @@ func DiffExtensions(dStateExts []model.Extension, dbExts []model.Extension) (ext
 
 // CreateExtension creates a postgres extension in the database
 func CreateExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Extension) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "CreateExtension")
 	_, err := dbConnection.Exec(ctx, fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS %s`, ext.Name))
 	if err != nil {
@@ -93,8 +91,7 @@ func CreateExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Exte
 
 // DropExtension drops a postgres extension from the database
 func DropExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Extension) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "DropExtension")
 	_, err := dbConnection.Exec(ctx, fmt.Sprintf(`DROP EXTENSION IF EXISTS %s`, ext.Name))
 	if err != nil {

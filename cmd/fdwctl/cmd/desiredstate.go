@@ -25,9 +25,7 @@ var (
 func preDoDesiredState(cmd *cobra.Command, _ []string) error {
 	var err error
 
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "preDoDesiredState")
 	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().GetDatabaseConnectionString())
 	if err != nil {
@@ -41,9 +39,7 @@ func postDoDesiredState(cmd *cobra.Command, _ []string) {
 }
 
 func doDesiredState(cmd *cobra.Command, _ []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "doDesiredState")
 	// Apply Extensions
 	err := applyExtensions(cmd.Context(), dbConnection)
@@ -119,9 +115,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 }
 
 func applyExtensions(ctx context.Context, dbConnection *pgx.Conn) error {
-	log := logger.
-		Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "applyExtensions")
 	// List extensions in DB
 	dbExts, err := util.GetExtensions(ctx, dbConnection)
@@ -152,9 +146,7 @@ func applyExtensions(ctx context.Context, dbConnection *pgx.Conn) error {
 }
 
 func applyUserMaps(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer) error {
-	log := logger.
-		Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "applyUserMaps")
 	// List Usermaps for this server in the DB
 	dbServerUsermaps, err := util.GetUserMapsForServer(ctx, dbConnection, server.Name)
@@ -211,9 +203,7 @@ func applyUserMaps(ctx context.Context, dbConnection *pgx.Conn, server model.For
 }
 
 func applySchemas(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer) error {
-	log := logger.
-		Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "applySchemas")
 	// Get DB remote schemas
 	dbSchemas, err := util.GetSchemas(ctx, dbConnection)

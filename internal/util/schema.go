@@ -14,8 +14,7 @@ import (
 
 // ensureSchema verifies that a schema with the supplied name exists and if it does not then it will be created
 func ensureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "ensureSchema")
 	query, args, err := sqrl.
 		Select("1").
@@ -65,8 +64,7 @@ func ensureSchema(ctx context.Context, dbConnection *pgx.Conn, schemaName string
 // getEnums returns a list of ENUM types
 func getEnums(ctx context.Context, dbConnection *pgx.Conn) ([]string, error) {
 	// FIXME: Doesn't this need to be constrained to a particular schema?
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "getEnums")
 	query, args, err := sqrl.
 		Select("typname").
@@ -100,8 +98,7 @@ func getEnums(ctx context.Context, dbConnection *pgx.Conn) ([]string, error) {
 
 // getSchemaEnumsUsedInTables returns a list of ENUM types that are used in tables of the specified schema
 func getSchemaEnumsUsedInTables(ctx context.Context, dbConnection *pgx.Conn, schemaName string) ([]string, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "getSchemaEnumsUsedInTables")
 	query, args, err := sqrl.
 		Select("cuu.udt_name").
@@ -139,8 +136,7 @@ func getSchemaEnumsUsedInTables(ctx context.Context, dbConnection *pgx.Conn, sch
 
 // getEnumStrings returns a list of string entries from the specified ENUM type
 func getEnumStrings(ctx context.Context, dbConnection *pgx.Conn, enumType string) ([]string, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "getEnumStrings")
 	query, args, err := sqrl.
 		Select("e.enumlabel").
@@ -176,8 +172,7 @@ func getEnumStrings(ctx context.Context, dbConnection *pgx.Conn, enumType string
 
 // GetSchemas returns a list of foreign schemas
 func GetSchemas(ctx context.Context, dbConnection *pgx.Conn) ([]model.Schema, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "GetSchemas")
 	query, _, _ := sqrl.
 		Select("DISTINCT ft.foreign_table_schema", "ft.foreign_server_name", "ftos.option_value AS remote_schema").
@@ -254,8 +249,7 @@ func DiffSchemas(dStateSchemas []model.Schema, dbSchemas []model.Schema) (schRem
 // DropSchema drops a database schema with optional CASCADE
 func DropSchema(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema, cascadeDrop bool) error {
 	// TODO: Figure out if it's feasible to also drop the foreign ENUMs as well to make the drop as clean as possible
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "DropSchema")
 	if schema.LocalSchema == "" {
 		return logger.ErrorfAsError(log, "local schema name is required")
@@ -275,8 +269,7 @@ func DropSchema(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema
 
 // importSchemaEnums attempts to create ENUM types locally that represent ENUM types used in the remote schema
 func importSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model.Schema) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "importSchemaEnums")
 	fdbConnStr := ResolveConnectionString(schema.ENUMConnection, &schema.ENUMSecret)
 	fdbConn, err := database.GetConnection(ctx, fdbConnStr)
@@ -330,8 +323,7 @@ func importSchemaEnums(ctx context.Context, dbConnection *pgx.Conn, schema model
 // ImportSchema attempts to import a remote schema from a foreign server into a local schema, optionally importing
 // ENUM types used in the remote schema as well.
 func ImportSchema(ctx context.Context, dbConnection *pgx.Conn, serverName string, schema model.Schema) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "ImportSchema")
 	// Sanity Check
 	if serverName == "" {

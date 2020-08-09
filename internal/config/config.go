@@ -55,7 +55,7 @@ func Instance() *appConfig {
 
 // UserConfigFile returns the resolved path and filename of the application configuration file
 func UserConfigFile() string {
-	log := logger.Root().
+	log := logger.Log().
 		WithField("function", "UserConfigFile")
 	xdgConfigHome, err := os.UserConfigDir()
 	if err != nil {
@@ -79,7 +79,7 @@ func UserConfigFile() string {
 
 // Load reads the specified file into the application configuration struct
 func Load(ac *appConfig, fileName string) error {
-	log := logger.Root().
+	log := logger.Log().
 		WithField("function", "Load")
 	fs := afero.NewOsFs()
 	configFileExists, err := afero.Exists(fs, fileName)

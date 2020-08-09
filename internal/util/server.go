@@ -11,8 +11,7 @@ import (
 )
 
 func GetServers(ctx context.Context, dbConnection *pgx.Conn) ([]model.ForeignServer, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "GetServers")
 	query, _, err := sqrl.
 		Select(
@@ -61,8 +60,7 @@ func FindForeignServer(foreignServers []model.ForeignServer, serverName string) 
 }
 
 func DropServer(ctx context.Context, dbConnection *pgx.Conn, servername string, cascade bool) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "DropServer")
 	if servername == "" {
 		return logger.ErrorfAsError(log, "server name is required")
@@ -81,8 +79,7 @@ func DropServer(ctx context.Context, dbConnection *pgx.Conn, servername string, 
 }
 
 func CreateServer(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "CreateServer")
 	query := fmt.Sprintf(
 		"CREATE SERVER %s FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s')",
@@ -101,8 +98,7 @@ func CreateServer(ctx context.Context, dbConnection *pgx.Conn, server model.Fore
 }
 
 func UpdateServer(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "UpdateServer")
 	// Edit server hostname, port, and dbname
 	query := fmt.Sprintf("ALTER SERVER %s OPTIONS (", server.Name)
@@ -128,8 +124,7 @@ func UpdateServer(ctx context.Context, dbConnection *pgx.Conn, server model.Fore
 }
 
 func UpdateServerName(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer, newServerName string) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "UpdateServerName")
 	query := fmt.Sprintf("ALTER SERVER %s RENAME TO %s", server.Name, newServerName)
 	log.Tracef("query: %s", query)

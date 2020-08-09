@@ -52,9 +52,7 @@ func init() {
 
 func preDoList(cmd *cobra.Command, _ []string) error {
 	var err error
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "preDoList")
 	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().GetDatabaseConnectionString())
 	if err != nil {
@@ -69,9 +67,7 @@ func postDoList(cmd *cobra.Command, _ []string) {
 
 func listServers(cmd *cobra.Command, _ []string) {
 	var err error
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "listServers")
 	servers, err := util.GetServers(cmd.Context(), dbConnection)
 	if err != nil {
@@ -87,9 +83,7 @@ func listServers(cmd *cobra.Command, _ []string) {
 }
 
 func listExtension(cmd *cobra.Command, _ []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "listExtension")
 	exts, err := util.GetExtensions(cmd.Context(), dbConnection)
 	if err != nil {
@@ -106,9 +100,7 @@ func listExtension(cmd *cobra.Command, _ []string) {
 
 func listUsermap(cmd *cobra.Command, args []string) {
 	var err error
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "listUsermap")
 	foreignServer := ""
 	if len(args) > 0 {
@@ -128,9 +120,7 @@ func listUsermap(cmd *cobra.Command, args []string) {
 }
 
 func listSchema(cmd *cobra.Command, _ []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "listSchema")
 	schemas, err := util.GetSchemas(cmd.Context(), dbConnection)
 	if err != nil {

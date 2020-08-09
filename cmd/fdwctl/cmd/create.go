@@ -89,9 +89,7 @@ func init() {
 
 func preDoCreate(cmd *cobra.Command, _ []string) error {
 	var err error
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "preDoCreate")
 	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().GetDatabaseConnectionString())
 	if err != nil {
@@ -105,8 +103,7 @@ func postDoCreate(cmd *cobra.Command, _ []string) {
 }
 
 func createExtension(cmd *cobra.Command, args []string) {
-	log := logger.Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "createExtension")
 	extName := strings.TrimSpace(args[0])
 	err := util.CreateExtension(cmd.Context(), dbConnection, model.Extension{
@@ -120,8 +117,7 @@ func createExtension(cmd *cobra.Command, args []string) {
 }
 
 func createServer(cmd *cobra.Command, args []string) {
-	log := logger.Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "createServer")
 	serverSlug := strings.TrimSpace(args[0])
 	if serverSlug == "" {
@@ -153,8 +149,7 @@ func createServer(cmd *cobra.Command, args []string) {
 }
 
 func createUsermap(cmd *cobra.Command, _ []string) {
-	log := logger.Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "createUsermap")
 	err := util.EnsureUser(cmd.Context(), dbConnection, localUser, remotePassword)
 	if err != nil {
@@ -177,8 +172,7 @@ func createUsermap(cmd *cobra.Command, _ []string) {
 }
 
 func createSchema(cmd *cobra.Command, _ []string) {
-	log := logger.Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "createSchema")
 	err := util.ImportSchema(cmd.Context(), dbConnection, csServerName, model.Schema{
 		ServerName:     csServerName,

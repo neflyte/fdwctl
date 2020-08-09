@@ -11,8 +11,7 @@ import (
 
 // GetConnection returns an established connection to a database using the supplied connection string
 func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "GetConnection")
 	if connectionString == "" {
 		return nil, logger.ErrorfAsError(log, "database connection string is required")
@@ -27,8 +26,7 @@ func GetConnection(ctx context.Context, connectionString string) (*pgx.Conn, err
 
 // CloseConnection closes a database connection and logs any resulting errors
 func CloseConnection(ctx context.Context, conn *pgx.Conn) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "CloseConnection")
 	if conn != nil && !conn.IsClosed() {
 		log.Debug("closing database connection")

@@ -62,7 +62,7 @@ func mapContainsKeys(haystack configmap.ConfigMap, needles []interface{}) bool {
 
 // connectionStringWithSecret returns a URL populated with a credential obtained using the supplied secret configuration
 func connectionStringWithSecret(connURL *url.URL, secret model.Secret) string {
-	log := logger.Root().
+	log := logger.Log().
 		WithField("function", "connectionStringWithSecret")
 	secretValue, err := GetSecret(context.Background(), secret)
 	if err != nil {
@@ -79,7 +79,7 @@ func ResolveConnectionString(connStr string, secret *model.Secret) string {
 	var connURL *url.URL
 	var err error
 
-	log := logger.Root().
+	log := logger.Log().
 		WithField("function", "ResolveConnectionString")
 	if connStr == "" {
 		return ""

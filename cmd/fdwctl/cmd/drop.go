@@ -61,9 +61,7 @@ func init() {
 
 func preDoDrop(cmd *cobra.Command, _ []string) error {
 	var err error
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "preDoDrop")
 	dbConnection, err = database.GetConnection(cmd.Context(), config.Instance().GetDatabaseConnectionString())
 	if err != nil {
@@ -77,9 +75,7 @@ func postDoDrop(cmd *cobra.Command, _ []string) {
 }
 
 func dropExtension(cmd *cobra.Command, args []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "dropExtension")
 	dropExtName := strings.TrimSpace(args[0])
 	err := util.DropExtension(cmd.Context(), dbConnection, model.Extension{
@@ -93,9 +89,7 @@ func dropExtension(cmd *cobra.Command, args []string) {
 }
 
 func dropServer(cmd *cobra.Command, args []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "dropServer")
 	dsServerName := strings.TrimSpace(args[0])
 	err := util.DropServer(cmd.Context(), dbConnection, dsServerName, cascadeDrop)
@@ -107,9 +101,7 @@ func dropServer(cmd *cobra.Command, args []string) {
 }
 
 func dropUsermap(cmd *cobra.Command, args []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "dropUsermap")
 	duServerName := strings.TrimSpace(args[0])
 	if duServerName == "" {
@@ -133,9 +125,7 @@ func dropUsermap(cmd *cobra.Command, args []string) {
 }
 
 func dropSchema(cmd *cobra.Command, args []string) {
-	log := logger.
-		Root().
-		WithContext(cmd.Context()).
+	log := logger.Log(cmd.Context()).
 		WithField("function", "dropSchema")
 	dsSchemaName := strings.TrimSpace(args[0])
 	if dsSchemaName == "" {

@@ -20,8 +20,7 @@ func FindUserMap(usermaps []model.UserMap, localuser string) *model.UserMap {
 }
 
 func GetUserMapsForServer(ctx context.Context, dbConnection *pgx.Conn, foreignServer string) ([]model.UserMap, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "GetUserMapsForServer")
 	qbuilder := sqrl.
 		Select("u.authorization_identifier", "ou.option_value", "op.option_value", "s.srvname").
@@ -82,8 +81,7 @@ func DiffUserMaps(dStateUserMaps []model.UserMap, dbUserMaps []model.UserMap) (u
 }
 
 func DropUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.UserMap, dropLocalUser bool) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "DropUserMap")
 	if usermap.ServerName == "" {
 		return logger.ErrorfAsError(log, "server name is required")
@@ -109,8 +107,8 @@ func DropUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.User
 func CreateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.UserMap) error {
 	var secretValue string
 	var err error
-	log := logger.Root().
-		WithContext(ctx).
+
+	log := logger.Log(ctx).
 		WithField("function", "CreateUserMap")
 	if usermap.ServerName == "" {
 		return logger.ErrorfAsError(log, "server name is required")
@@ -136,8 +134,7 @@ func CreateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.Us
 }
 
 func UpdateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.UserMap) error {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "UpdateUserMap")
 	if usermap.ServerName == "" {
 		return logger.ErrorfAsError(log, "server name is required")

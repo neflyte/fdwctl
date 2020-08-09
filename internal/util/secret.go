@@ -18,8 +18,7 @@ func SecretIsDefined(secret model.Secret) bool {
 }
 
 func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
-	log := logger.Root().
-		WithContext(ctx).
+	log := logger.Log(ctx).
 		WithField("function", "GetSecret")
 	// (1) Explicit value
 	if secret.Value != "" {

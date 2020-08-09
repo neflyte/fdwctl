@@ -4,10 +4,12 @@ Package logger handles application logging
 package logger
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -31,17 +33,29 @@ const (
 	JSONFormat = "json"
 	// TextFormat represents the text logging format
 	TextFormat = "text"
+	// ECSFormat represents the Elasticstack Common Schema (ECS) JSON logging format
+	ECSFormat = "elastic"
 )
 
 var (
 	// rootLogger is the singleton application logger
 	rootLogger *logrus.Logger
+	// rootLoggerFields is the map of fields to include in every log message
+	rootLoggerFields = make(logrus.Fields)
 )
 
 // SetFormat configures the logger message format
 func SetFormat(format string) {
 	formatStr := strings.TrimSpace(strings.ToLower(format))
 	switch formatStr {
+	case ECSFormat:
+		Root().SetFormatter(&logrus.JSONFormatter{
+			FieldMap: logrus.FieldMap{
+				logrus.FieldKeyTime: "@timestamp",
+				logrus.FieldKeyMsg:  "message",
+			},
+		})
+		Root().AddHook(NewElasticHook())
 	case JSONFormat:
 		Root().SetFormatter(&logrus.JSONFormatter{})
 	case TextFormat:
@@ -81,8 +95,38 @@ func Root() *logrus.Logger {
 	if rootLogger == nil {
 		rootLogger = logrus.StandardLogger()
 		rootLogger.SetLevel(logrus.DebugLevel)
+		// Get machine hostname
+		hostname, err := os.Hostname()
+		if err != nil {
+			Root().WithField("function", "SetFormat").
+				Errorf("error getting hostname: %s", err)
+			hostname = ""
+		}
+		// If the hostname is non-empty, add it as a logger field
+		if hostname != "" {
+			rootLoggerFields["host"] = map[string]interface{}{
+				"name": hostname,
+			}
+		}
 	}
 	return rootLogger
+}
+
+// Log returns a logrus FieldLogger including the root fields and an optional context
+func Log(args ...interface{}) logrus.FieldLogger {
+	var entry *logrus.Entry
+	for _, arg := range args {
+		switch obj := arg.(type) {
+		case context.Context:
+			entry = rootLogger.WithContext(obj)
+		}
+	}
+	if entry == nil {
+		entry = rootLogger.WithFields(rootLoggerFields)
+	} else {
+		entry = entry.WithFields(rootLoggerFields)
+	}
+	return entry
 }
 
 // ErrorfAsError logs an Error message to the supplied logger and then returns a
@@ -96,7 +140,7 @@ func ErrorfAsError(log logrus.FieldLogger, format string, args ...interface{}) e
 
 // SanitizedURLString returns a parsed URL string with user credentials removed
 func SanitizedURLString(urlWithCreds string) string {
-	log := Root().
+	log := Log().
 		WithField("function", "SanitizedURLString")
 	clone, err := url.Parse(urlWithCreds)
 	if err != nil {
