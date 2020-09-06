@@ -57,14 +57,9 @@ func Instance() *appConfig {
 func UserConfigFile() string {
 	log := logger.Log().
 		WithField("function", "UserConfigFile")
-	xdgConfigHome, err := os.UserConfigDir()
-	if err != nil {
-		log.Errorf("error getting user config directory: %s", err)
-		xdgConfigHome = ""
-	}
-	if xdgConfigHome == "" {
-		homedir := ""
-		homedir, err = os.UserHomeDir()
+	xdgConfigHome, ok := os.LookupEnv("XDG_CONFIG_HOME")
+	if xdgConfigHome == "" || !ok {
+		homedir, err := os.UserHomeDir()
 		if err != nil {
 			log.Errorf("error getting user home directory: %s", err)
 		}

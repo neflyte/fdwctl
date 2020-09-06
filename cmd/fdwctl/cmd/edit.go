@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -25,13 +26,13 @@ var (
 	editServerCmd = &cobra.Command{
 		Use:   "server <server name>",
 		Short: "Edit a foreign server",
-		Run:   editServer,
+		RunE:  editServer,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	editUsermapCmd = &cobra.Command{
 		Use:   "usermap <server name> <local user>",
 		Short: "Edit a user mapping for a foreign server",
-		Run:   editUsermap,
+		RunE:  editUsermap,
 		Args:  cobra.MinimumNArgs(editUserCmdMinArgCount),
 	}
 	editServerName     string
@@ -68,18 +69,18 @@ func postDoEdit(cmd *cobra.Command, _ []string) {
 	database.CloseConnection(cmd.Context(), dbConnection)
 }
 
-func editServer(cmd *cobra.Command, args []string) {
+func editServer(cmd *cobra.Command, args []string) error {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "editServer")
 	esServerName := strings.TrimSpace(args[0])
 	if esServerName == "" {
 		log.Errorf("server name is required")
-		return
+		return fmt.Errorf("server name is required")
 	}
 	portInt, err := strconv.Atoi(editServerPort)
 	if err != nil {
 		log.Errorf("error converting port to integer: %s", err)
-		return
+		return err
 	}
 	fServer := model.ForeignServer{
 		Name: esServerName,
@@ -90,7 +91,7 @@ func editServer(cmd *cobra.Command, args []string) {
 	err = util.UpdateServer(cmd.Context(), dbConnection, fServer)
 	if err != nil {
 		log.Errorf("error editing server: %s", err)
-		return
+		return err
 	}
 	log.Infof("server %s edited", esServerName)
 	// Rename server entry
@@ -98,24 +99,25 @@ func editServer(cmd *cobra.Command, args []string) {
 		err = util.UpdateServerName(cmd.Context(), dbConnection, fServer, editServerName)
 		if err != nil {
 			log.Errorf("error renaming foreign server: %s", err)
-			return
+			return err
 		}
 		log.Infof("server %s renamed to %s", esServerName, editServerName)
 	}
+	return nil
 }
 
-func editUsermap(cmd *cobra.Command, args []string) {
+func editUsermap(cmd *cobra.Command, args []string) error {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "editServer")
 	euServerName := strings.TrimSpace(args[0])
 	if euServerName == "" {
 		log.Errorf("server name is required")
-		return
+		return fmt.Errorf("server name is required")
 	}
 	euLocalUser := strings.TrimSpace(args[1])
 	if euLocalUser == "" {
 		log.Errorf("local user name is required")
-		return
+		return fmt.Errorf("local user name is required")
 	}
 	err := util.UpdateUserMap(cmd.Context(), dbConnection, model.UserMap{
 		ServerName: euServerName,
@@ -127,7 +129,8 @@ func editUsermap(cmd *cobra.Command, args []string) {
 	})
 	if err != nil {
 		log.Errorf("error editing user mapping: %s", err)
-		return
+		return err
 	}
 	log.Infof("user mapping %s edited", euLocalUser)
+	return nil
 }
