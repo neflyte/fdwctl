@@ -3,13 +3,13 @@ package model
 // UserMap represents a Postgres user mapping
 type UserMap struct {
 	// ServerName is the name of the foreign server
-	ServerName string `yaml:"-" json:"-"`
+	ServerName string `yaml:"-" json:"-" db:"svrname"`
 	// LocalUser is the name of the local database user to map
-	LocalUser string `yaml:"localuser" json:"localuser"`
+	LocalUser string `yaml:"localuser" json:"localuser" db:"authorization_identifier"`
 	// RemoteUser is the name of the remote database user to connect as
-	RemoteUser string `yaml:"remoteuser" json:"remoteuser"`
+	RemoteUser string `yaml:"remoteuser" json:"remoteuser" db:"user"`
 	// RemoteSecret configures how to retrieve the optional credential for the RemoteUser user
-	RemoteSecret Secret `yaml:"remotesecret" json:"remotesecret"`
+	RemoteSecret Secret `yaml:"remotesecret" json:"remotesecret" db:"password"`
 }
 
 // Equals determines if this object is equal to the supplied object

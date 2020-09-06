@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/elgris/sqrl"
-	"github.com/jackc/pgx/v4"
+	"github.com/jmoiron/sqlx"
+	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
 	"strings"
@@ -19,11 +20,16 @@ func FindUserMap(usermaps []model.UserMap, localuser string) *model.UserMap {
 	return nil
 }
 
-func GetUserMapsForServer(ctx context.Context, dbConnection *pgx.Conn, foreignServer string) ([]model.UserMap, error) {
+func GetUserMapsForServer(ctx context.Context, dbConnection *sqlx.DB, foreignServer string) ([]model.UserMap, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetUserMapsForServer")
 	qbuilder := sqrl.
-		Select("u.authorization_identifier", "ou.option_value", "op.option_value", "s.srvname").
+		Select(
+			"u.authorization_identifier AS authorization_identifier",
+			"ou.option_value AS user",
+			"op.option_value AS password",
+			"s.srvname AS srvname",
+		).
 		From("information_schema.user_mappings u").
 		Join("information_schema.user_mapping_options ou ON ou.authorization_identifier = u.authorization_identifier AND ou.option_name = 'user'").
 		Join("information_schema.user_mapping_options op ON op.authorization_identifier = u.authorization_identifier AND op.option_name = 'password'").
@@ -39,16 +45,16 @@ func GetUserMapsForServer(ctx context.Context, dbConnection *pgx.Conn, foreignSe
 		return nil, err
 	}
 	log.Tracef("query: %s, args: %#v", query, qArgs)
-	userRows, err := dbConnection.Query(ctx, query, qArgs...)
+	userRows, err := dbConnection.QueryxContext(ctx, query, qArgs...)
 	if err != nil {
 		log.Errorf("error getting users for server: %s", err)
 		return nil, err
 	}
-	defer userRows.Close()
+	defer database.CloseRows(ctx, userRows)
 	users := make([]model.UserMap, 0)
+	user := new(model.UserMap)
 	for userRows.Next() {
-		user := new(model.UserMap)
-		err = userRows.Scan(&user.LocalUser, &user.RemoteUser, &user.RemoteSecret.Value, &user.ServerName)
+		err = userRows.StructScan(user)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
@@ -80,7 +86,7 @@ func DiffUserMaps(dStateUserMaps []model.UserMap, dbUserMaps []model.UserMap) (u
 	return
 }
 
-func DropUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.UserMap, dropLocalUser bool) error {
+func DropUserMap(ctx context.Context, dbConnection *sqlx.DB, usermap model.UserMap, dropLocalUser bool) error {
 	log := logger.Log(ctx).
 		WithField("function", "DropUserMap")
 	if usermap.ServerName == "" {
@@ -88,7 +94,7 @@ func DropUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.User
 	}
 	query := fmt.Sprintf("DROP USER MAPPING IF EXISTS FOR %s SERVER %s", usermap.LocalUser, usermap.ServerName)
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(ctx, query)
+	_, err := dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		log.Errorf("error dropping user mapping: %s", err)
 		return err
@@ -104,7 +110,7 @@ func DropUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.User
 	return nil
 }
 
-func CreateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.UserMap) error {
+func CreateUserMap(ctx context.Context, dbConnection *sqlx.DB, usermap model.UserMap) error {
 	var secretValue string
 	var err error
 
@@ -125,7 +131,7 @@ func CreateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.Us
 	// FIXME: There could be no password at all; check for a password before using it in the SQL statement
 	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, secretValue)
 	log.Tracef("query: %s", query)
-	_, err = dbConnection.Exec(ctx, query)
+	_, err = dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		log.Errorf("error creating user mapping: %s", err)
 		return err
@@ -133,7 +139,7 @@ func CreateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.Us
 	return nil
 }
 
-func UpdateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.UserMap) error {
+func UpdateUserMap(ctx context.Context, dbConnection *sqlx.DB, usermap model.UserMap) error {
 	log := logger.Log(ctx).
 		WithField("function", "UpdateUserMap")
 	if usermap.ServerName == "" {
@@ -153,7 +159,7 @@ func UpdateUserMap(ctx context.Context, dbConnection *pgx.Conn, usermap model.Us
 	}
 	query = fmt.Sprintf("%s %s )", query, strings.Join(optArgs, ", "))
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(ctx, query)
+	_, err := dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		log.Errorf("error editing user mapping: %s", err)
 		return err

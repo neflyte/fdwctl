@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"github.com/jackc/pgx/v4"
+	"github.com/jmoiron/sqlx"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -114,7 +114,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) {
 	log.Info("desired state applied.")
 }
 
-func applyExtensions(ctx context.Context, dbConnection *pgx.Conn) error {
+func applyExtensions(ctx context.Context, dbConnection *sqlx.DB) error {
 	log := logger.Log(ctx).
 		WithField("function", "applyExtensions")
 	// List extensions in DB
@@ -145,7 +145,7 @@ func applyExtensions(ctx context.Context, dbConnection *pgx.Conn) error {
 	return nil
 }
 
-func applyUserMaps(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer) error {
+func applyUserMaps(ctx context.Context, dbConnection *sqlx.DB, server model.ForeignServer) error {
 	log := logger.Log(ctx).
 		WithField("function", "applyUserMaps")
 	// List Usermaps for this server in the DB
@@ -202,7 +202,7 @@ func applyUserMaps(ctx context.Context, dbConnection *pgx.Conn, server model.For
 	return nil
 }
 
-func applySchemas(ctx context.Context, dbConnection *pgx.Conn, server model.ForeignServer) error {
+func applySchemas(ctx context.Context, dbConnection *sqlx.DB, server model.ForeignServer) error {
 	log := logger.Log(ctx).
 		WithField("function", "applySchemas")
 	// Get DB remote schemas

@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/elgris/sqrl"
-	"github.com/jackc/pgx/v4"
+	"github.com/jmoiron/sqlx"
+	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 )
 
-func EnsureUser(ctx context.Context, dbConnection *pgx.Conn, userName string, userPassword string) error {
+func EnsureUser(ctx context.Context, dbConnection *sqlx.DB, userName string, userPassword string) error {
 	log := logger.Log(ctx).
 		WithField("function", "EnsureUser")
 	query, args, err := sqrl.Select("1").
@@ -20,14 +21,14 @@ func EnsureUser(ctx context.Context, dbConnection *pgx.Conn, userName string, us
 		return fmt.Errorf("error creating query: %s", err)
 	}
 	log.Tracef("query: %s, args: %#v", query, args)
-	rows, err := dbConnection.Query(ctx, query, args...)
+	rows, err := dbConnection.QueryxContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("error verifying user: %s", err)
 	}
-	defer rows.Close()
+	defer database.CloseRows(ctx, rows)
 	userExists := false
+	var foo int
 	if rows.Next() {
-		var foo int
 		err = rows.Scan(&foo)
 		if err != nil {
 			return fmt.Errorf("error scanning result row: %s", err)
@@ -40,7 +41,7 @@ func EnsureUser(ctx context.Context, dbConnection *pgx.Conn, userName string, us
 		log.Debugf("user does not exist; creating")
 		query = fmt.Sprintf("CREATE USER %s WITH PASSWORD '%s'", userName, userPassword)
 		log.Tracef("query: %s", query)
-		_, err = dbConnection.Exec(ctx, query)
+		_, err = dbConnection.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("error creating user: %s", err)
 		}
@@ -51,7 +52,7 @@ func EnsureUser(ctx context.Context, dbConnection *pgx.Conn, userName string, us
 	return nil
 }
 
-func DropUser(ctx context.Context, dbConnection *pgx.Conn, username string) error {
+func DropUser(ctx context.Context, dbConnection *sqlx.DB, username string) error {
 	log := logger.Log(ctx).
 		WithField("function", "DropUser")
 	if username == "" {
@@ -59,7 +60,7 @@ func DropUser(ctx context.Context, dbConnection *pgx.Conn, username string) erro
 	}
 	query := fmt.Sprintf("DROP USER IF EXISTS %s", username)
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.Exec(ctx, query)
+	_, err := dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		log.Errorf("error dropping user: %s", err)
 		return err

@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/elgris/sqrl"
-	"github.com/jackc/pgx/v4"
+	"github.com/jmoiron/sqlx"
+	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
 )
 
 // GetExtensions returns a list of installed extensions
-func GetExtensions(ctx context.Context, dbConnection *pgx.Conn) ([]model.Extension, error) {
+func GetExtensions(ctx context.Context, dbConnection *sqlx.DB) ([]model.Extension, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetExtensions")
 	exts := make([]model.Extension, 0)
@@ -22,23 +23,20 @@ func GetExtensions(ctx context.Context, dbConnection *pgx.Conn) ([]model.Extensi
 		log.Errorf("error creating query: %s", err)
 		return nil, err
 	}
-	rows, err := dbConnection.Query(ctx, query)
+	rows, err := dbConnection.QueryxContext(ctx, query)
 	if err != nil {
 		log.Errorf("error querying for extensions: %s", err)
 		return nil, err
 	}
-	defer rows.Close()
-	var extname, extversion string
+	defer database.CloseRows(ctx, rows)
+	ext := new(model.Extension)
 	for rows.Next() {
-		err = rows.Scan(&extname, &extversion)
+		err = rows.StructScan(ext)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			return nil, err
 		}
-		exts = append(exts, model.Extension{
-			Name:    extname,
-			Version: extversion,
-		})
+		exts = append(exts, *ext)
 	}
 	return exts, nil
 }
@@ -79,10 +77,10 @@ func DiffExtensions(dStateExts []model.Extension, dbExts []model.Extension) (ext
 }
 
 // CreateExtension creates a postgres extension in the database
-func CreateExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Extension) error {
+func CreateExtension(ctx context.Context, dbConnection *sqlx.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "CreateExtension")
-	_, err := dbConnection.Exec(ctx, fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS %s`, ext.Name))
+	_, err := dbConnection.ExecContext(ctx, fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS %s`, ext.Name))
 	if err != nil {
 		return logger.ErrorfAsError(log, "error creating extension %s: %s", ext.Name, err)
 	}
@@ -90,10 +88,10 @@ func CreateExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Exte
 }
 
 // DropExtension drops a postgres extension from the database
-func DropExtension(ctx context.Context, dbConnection *pgx.Conn, ext model.Extension) error {
+func DropExtension(ctx context.Context, dbConnection *sqlx.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "DropExtension")
-	_, err := dbConnection.Exec(ctx, fmt.Sprintf(`DROP EXTENSION IF EXISTS %s`, ext.Name))
+	_, err := dbConnection.ExecContext(ctx, fmt.Sprintf(`DROP EXTENSION IF EXISTS %s`, ext.Name))
 	if err != nil {
 		return logger.ErrorfAsError(log, "error dropping extension %s: %s", ext.Name, err)
 	}

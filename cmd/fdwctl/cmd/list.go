@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/jackc/pgx/v4"
+	"github.com/jmoiron/sqlx"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -40,7 +40,7 @@ var (
 		Short: "List schemas that contain foreign tables",
 		Run:   listSchema,
 	}
-	dbConnection *pgx.Conn
+	dbConnection *sqlx.DB
 )
 
 func init() {
