@@ -8,7 +8,7 @@ build: lint test
 .PHONY: build build-docker clean start-docker stop-docker restart-docker lint test
 
 build-docker: clean lint test
-	DOCKER_BUILDKIT=1 docker build --no-cache --build-arg "APPVERSION=$(APPVERSION)" -t "neflyte/fdwctl:$(APPVERSION)" .
+	docker build --no-cache --build-arg "APPVERSION=$(APPVERSION)" -t "neflyte/fdwctl:$(APPVERSION)" .
 
 clean:
 	{ [ -f "./fdwctl" ] && rm -f ./fdwctl; } || true
