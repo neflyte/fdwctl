@@ -251,5 +251,16 @@ func applySchemas(ctx context.Context, dbConnection *sqlx.DB, server model.Forei
 		// Done
 		log.Infof("foreign schema %s re-imported", schemaToModify.RemoteSchema)
 	}
+	// Process permission grants
+	grantSchemas := make([]model.Schema, 0)
+	grantSchemas = append(grantSchemas, schAdd...)
+	grantSchemas = append(grantSchemas, schModify...)
+	for _, grantSchema := range grantSchemas {
+		err = util.PerformGrants(ctx, dbConnection, grantSchema)
+		if err != nil {
+			log.Errorf("error applying permissions: %s", err)
+			return err
+		}
+	}
 	return nil
 }

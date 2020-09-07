@@ -356,3 +356,66 @@ func ImportSchema(ctx context.Context, dbConnection *sqlx.DB, serverName string,
 	}
 	return nil
 }
+
+func PerformGrants(ctx context.Context, dbConnection *sqlx.DB, schema model.Schema) error {
+	log := logger.Log(ctx).
+		WithField("function", "PerformGrants")
+	if len(schema.Grants) > 0 {
+		for _, grant := range schema.Grants {
+			log.Debugf("performing grants for user %s", grant.User)
+			if grant.Permissions.Usage {
+				err := grantUsage(ctx, dbConnection, schema.LocalSchema, grant.User)
+				if err != nil {
+					log.Errorf("error granting usage to user %s: %s", grant.User, err)
+					return err
+				}
+			}
+			if grant.Permissions.Select {
+				err := grantSelect(ctx, dbConnection, schema.LocalSchema, grant.User)
+				if err != nil {
+					log.Errorf("error granting select to user %s: %s", grant.User, err)
+					return err
+				}
+			}
+		}
+	} else {
+		log.Debugf("no user grants for schema %s/%s", schema.ServerName, schema.RemoteSchema)
+	}
+	return nil
+}
+
+func grantUsage(ctx context.Context, dbConnection *sqlx.DB, schemaName string, user string) error {
+	log := logger.Log(ctx).
+		WithField("function", "grantUsage")
+	sb := new(strings.Builder)
+	sb.WriteString("GRANT USAGE ON SCHEMA ")
+	sb.WriteString(schemaName)
+	sb.WriteString(" TO ")
+	sb.WriteString(user)
+	query := sb.String()
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.ExecContext(ctx, query)
+	if err != nil {
+		log.Errorf("error granting usage on schema %s to user %s: %s", schemaName, user, err)
+		return err
+	}
+	return nil
+}
+
+func grantSelect(ctx context.Context, dbConnection *sqlx.DB, schemaName string, user string) error {
+	log := logger.Log(ctx).
+		WithField("function", "grantSelect")
+	sb := new(strings.Builder)
+	sb.WriteString("GRANT SELECT ON ALL TABLES IN SCHEMA ")
+	sb.WriteString(schemaName)
+	sb.WriteString(" TO ")
+	sb.WriteString(user)
+	query := sb.String()
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.ExecContext(ctx, query)
+	if err != nil {
+		log.Errorf("error granting select on schema %s to user %s: %s", schemaName, user, err)
+		return err
+	}
+	return nil
+}
