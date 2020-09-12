@@ -255,12 +255,16 @@ func applySchemas(ctx context.Context, dbConnection *sqlx.DB, server model.Forei
 	grantSchemas := make([]model.Schema, 0)
 	grantSchemas = append(grantSchemas, schAdd...)
 	grantSchemas = append(grantSchemas, schModify...)
+	log.Tracef("len(grantSchemas)=%d", len(grantSchemas))
 	for _, grantSchema := range grantSchemas {
+		log.Debugf("applying permissions for schema %s", grantSchema.LocalSchema)
+		grantSchema.ServerName = server.Name
 		err = util.PerformGrants(ctx, dbConnection, grantSchema)
 		if err != nil {
 			log.Errorf("error applying permissions: %s", err)
 			return err
 		}
 	}
+	log.Debug("done applying permissions")
 	return nil
 }

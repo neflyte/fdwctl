@@ -54,7 +54,7 @@ func GetUserMapsForServer(ctx context.Context, dbConnection *sqlx.DB, foreignSer
 	users := make([]model.UserMap, 0)
 	user := new(model.UserMap)
 	for userRows.Next() {
-		err = userRows.StructScan(user)
+		err = userRows.Scan(&user.LocalUser, &user.RemoteUser, &user.RemoteSecret.Value, &user.ServerName)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue

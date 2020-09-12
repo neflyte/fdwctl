@@ -364,7 +364,7 @@ func PerformGrants(ctx context.Context, dbConnection *sqlx.DB, schema model.Sche
 		for _, grant := range schema.Grants {
 			log.Debugf("performing grants for user %s", grant.User)
 			if grant.Permissions.Usage {
-				err := grantUsage(ctx, dbConnection, schema.LocalSchema, grant.User)
+				err := grantUsage(ctx, dbConnection, schema, grant.User)
 				if err != nil {
 					log.Errorf("error granting usage to user %s: %s", grant.User, err)
 					return err
@@ -384,19 +384,33 @@ func PerformGrants(ctx context.Context, dbConnection *sqlx.DB, schema model.Sche
 	return nil
 }
 
-func grantUsage(ctx context.Context, dbConnection *sqlx.DB, schemaName string, user string) error {
+func grantUsage(ctx context.Context, dbConnection *sqlx.DB, schema model.Schema, user string) error {
 	log := logger.Log(ctx).
 		WithField("function", "grantUsage")
+	// Grant USAGE on FOREIGN SERVER
 	sb := new(strings.Builder)
-	sb.WriteString("GRANT USAGE ON SCHEMA ")
-	sb.WriteString(schemaName)
+	sb.WriteString("GRANT USAGE ON FOREIGN SERVER ")
+	sb.WriteString(schema.ServerName)
 	sb.WriteString(" TO ")
 	sb.WriteString(user)
 	query := sb.String()
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.ExecContext(ctx, query)
 	if err != nil {
-		log.Errorf("error granting usage on schema %s to user %s: %s", schemaName, user, err)
+		log.Errorf("error granting usage on foreign server %s to user %s: %s", schema.ServerName, user, err)
+		return err
+	}
+	// Grant USAGE on SCHEMA
+	sb = new(strings.Builder)
+	sb.WriteString("GRANT USAGE ON SCHEMA ")
+	sb.WriteString(schema.LocalSchema)
+	sb.WriteString(" TO ")
+	sb.WriteString(user)
+	query = sb.String()
+	log.Tracef("query: %s", query)
+	_, err = dbConnection.ExecContext(ctx, query)
+	if err != nil {
+		log.Errorf("error granting usage on schema %s to user %s: %s", schema.LocalSchema, user, err)
 		return err
 	}
 	return nil

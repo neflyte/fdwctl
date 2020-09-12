@@ -2,8 +2,8 @@ package model
 
 // Schema represents a foreign schema configuration
 type Schema struct {
-	ServerName     string  `yaml:"-" json:"-" db:"ft.foreign_server_name"`                          // ServerName is the name of the foreign server that will be used to import the remote schema
-	LocalSchema    string  `yaml:"localschema" json:"localschema" db:"ft.foreign_table_schema"`     // LocalSchema is the name of the local schema that the remote schema will be imported into
+	ServerName     string  `yaml:"-" json:"-" db:"foreign_server_name"`                             // ServerName is the name of the foreign server that will be used to import the remote schema
+	LocalSchema    string  `yaml:"localschema" json:"localschema" db:"foreign_table_schema"`        // LocalSchema is the name of the local schema that the remote schema will be imported into
 	RemoteSchema   string  `yaml:"remoteschema" json:"remoteschema" db:"remote_schema"`             // RemoteSchema is the name of the remote schema to import
 	ImportENUMs    bool    `yaml:"importenums" json:"importenums" db:"-"`                           // ImportENUMs indicates whether remote ENUM types should be auto-created locally before importing
 	ENUMConnection string  `yaml:"enumconnection,omitempty" json:"enumconnection,omitempty" db:"-"` // ENUMConnection specifies the connection string to the remote database for reading ENUM definitions

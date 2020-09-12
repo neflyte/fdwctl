@@ -18,13 +18,13 @@ func (sk *SecretK8s) Equals(secret SecretK8s) bool {
 // Secret defines where to retrieve a credential from
 type Secret struct {
 	// Value represents an explicit credential value to be used verbatim
-	Value string `yaml:"value,omitempty" json:"value,omitempty"`
+	Value string `yaml:"value,omitempty" json:"value,omitempty" db:"password,omitempty"`
 	// FromEnv represents an environment variable to read the credential from
-	FromEnv string `yaml:"fromEnv,omitempty" json:"fromEnv,omitempty"`
+	FromEnv string `yaml:"fromEnv,omitempty" json:"fromEnv,omitempty" db:"-"`
 	// FromFile represents a path and filename to read the credential from
-	FromFile string `yaml:"fromFile,omitempty" json:"fromFile,omitempty"`
+	FromFile string `yaml:"fromFile,omitempty" json:"fromFile,omitempty" db:"-"`
 	// FromK8sSecret represents a Kubernetes secret to read the credential from
-	FromK8sSecret SecretK8s `yaml:"fromK8s,omitempty" json:"fromK8s,omitempty"`
+	FromK8sSecret SecretK8s `yaml:"fromK8s,omitempty" json:"fromK8s,omitempty" db:"-"`
 }
 
 // Equals determines if this object is equal to the supplied object
