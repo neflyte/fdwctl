@@ -97,7 +97,7 @@ func Load(ac *appConfig, fileName string) error {
 	if err != nil {
 		return logger.ErrorfAsError(log, "error unmarshaling config: %s", err)
 	}
-	log.Debugf("loaded config: %#v", ac)
+	log.Tracef("loaded config: %#v", ac)
 	return nil
 }
 

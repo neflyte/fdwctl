@@ -40,7 +40,8 @@ func EnsureUser(ctx context.Context, dbConnection *sqlx.DB, userName string, use
 	if !userExists {
 		log.Debugf("user does not exist; creating")
 		query = fmt.Sprintf("CREATE USER %s WITH PASSWORD '%s'", userName, userPassword)
-		log.Tracef("query: %s", query)
+		sQuery := fmt.Sprintf("CREATE USER %s WITH PASSWORD '...'", userName)
+		log.Tracef("query: %s", sQuery)
 		_, err = dbConnection.ExecContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("error creating user: %s", err)

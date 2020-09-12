@@ -18,7 +18,7 @@ func GetConnection(ctx context.Context, connectionString string) (*sqlx.DB, erro
 	if connectionString == "" {
 		return nil, logger.ErrorfAsError(log, "database connection string is required")
 	}
-	log.Debugf("opening database connection to %s", logger.SanitizedURLString(connectionString))
+	log.Tracef("opening database connection to %s", logger.SanitizedURL(connectionString))
 	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
 		return nil, logger.ErrorfAsError(log, "error connecting to database: %s", err)
@@ -31,7 +31,7 @@ func CloseConnection(ctx context.Context, conn *sqlx.DB) {
 	log := logger.Log(ctx).
 		WithField("function", "CloseConnection")
 	if conn != nil {
-		log.Debug("closing database connection")
+		log.Trace("closing database connection")
 		err := conn.Close()
 		if err != nil {
 			log.Errorf("error closing database connection: %s", err)
@@ -44,7 +44,7 @@ func CloseRows(ctx context.Context, rows *sqlx.Rows) {
 	log := logger.Log(ctx).
 		WithField("function", "CloseRows")
 	if rows != nil {
-		log.Debug("closing rows")
+		log.Trace("closing rows")
 		err := rows.Close()
 		if err != nil {
 			log.Errorf("error closing rows: %s", err)

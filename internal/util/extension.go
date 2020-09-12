@@ -23,6 +23,7 @@ func GetExtensions(ctx context.Context, dbConnection *sqlx.DB) ([]model.Extensio
 		log.Errorf("error creating query: %s", err)
 		return nil, err
 	}
+	log.Tracef("query: %s", query)
 	rows, err := dbConnection.QueryxContext(ctx, query)
 	if err != nil {
 		log.Errorf("error querying for extensions: %s", err)
@@ -80,7 +81,9 @@ func DiffExtensions(dStateExts []model.Extension, dbExts []model.Extension) (ext
 func CreateExtension(ctx context.Context, dbConnection *sqlx.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "CreateExtension")
-	_, err := dbConnection.ExecContext(ctx, fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS %s`, ext.Name))
+	query := fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS %s`, ext.Name)
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		return logger.ErrorfAsError(log, "error creating extension %s: %s", ext.Name, err)
 	}
@@ -91,7 +94,9 @@ func CreateExtension(ctx context.Context, dbConnection *sqlx.DB, ext model.Exten
 func DropExtension(ctx context.Context, dbConnection *sqlx.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "DropExtension")
-	_, err := dbConnection.ExecContext(ctx, fmt.Sprintf(`DROP EXTENSION IF EXISTS %s`, ext.Name))
+	query := fmt.Sprintf(`DROP EXTENSION IF EXISTS %s`, ext.Name)
+	log.Tracef("query: %s", query)
+	_, err := dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		return logger.ErrorfAsError(log, "error dropping extension %s: %s", ext.Name, err)
 	}

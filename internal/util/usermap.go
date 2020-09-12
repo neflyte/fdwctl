@@ -8,8 +8,25 @@ import (
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
+	"regexp"
 	"strings"
 )
+
+const (
+	passwordREexp       = `password '([^']*)'`
+	passwordReplacement = `password '...'`
+)
+
+var (
+	PasswordRE = regexp.MustCompile(passwordREexp)
+)
+
+func SanitizePasswordInSQL(sql string) string {
+	if PasswordRE.MatchString(sql) {
+		return PasswordRE.ReplaceAllString(sql, passwordReplacement)
+	}
+	return sql
+}
 
 func FindUserMap(usermaps []model.UserMap, localuser string) *model.UserMap {
 	for _, usermap := range usermaps {
@@ -128,9 +145,20 @@ func CreateUserMap(ctx context.Context, dbConnection *sqlx.DB, usermap model.Use
 	} else {
 		secretValue = ""
 	}
-	// FIXME: There could be no password at all; check for a password before using it in the SQL statement
-	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, secretValue)
-	log.Tracef("query: %s", query)
+	sb := new(strings.Builder)
+	sb.WriteString("CREATE USER MAPPING FOR ")
+	sb.WriteString(usermap.LocalUser)
+	sb.WriteString(" SERVER ")
+	sb.WriteString(usermap.ServerName)
+	sb.WriteString(" OPTIONS (user '")
+	sb.WriteString(usermap.RemoteUser)
+	if secretValue != "" {
+		sb.WriteString("', password '")
+		sb.WriteString(secretValue)
+	}
+	sb.WriteString("')")
+	query := sb.String()
+	log.Tracef("query: %s", SanitizePasswordInSQL(query))
 	_, err = dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		log.Errorf("error creating user mapping: %s", err)
@@ -158,7 +186,7 @@ func UpdateUserMap(ctx context.Context, dbConnection *sqlx.DB, usermap model.Use
 		optArgs = append(optArgs, fmt.Sprintf("SET password '%s'", secretValue))
 	}
 	query = fmt.Sprintf("%s %s )", query, strings.Join(optArgs, ", "))
-	log.Tracef("query: %s", query)
+	log.Tracef("query: %s", SanitizePasswordInSQL(query))
 	_, err := dbConnection.ExecContext(ctx, query)
 	if err != nil {
 		log.Errorf("error editing user mapping: %s", err)

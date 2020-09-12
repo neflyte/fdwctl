@@ -26,4 +26,7 @@ lint:
 	golangci-lint run
 
 test:
-	CGO_ENABLED=0 go test ./...
+	{ test -d coverage && rm -Rf coverage; } || true
+	{ mkdir coverage; } || true
+	CGO_ENABLED=0 go test -failfast -count 1 -covermode count -coverprofile coverage/c.out -run Unit ./...
+	go tool cover -html coverage/c.out -o coverage/coverage-heatmap.html

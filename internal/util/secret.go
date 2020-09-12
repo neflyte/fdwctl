@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 func SecretIsDefined(secret model.Secret) bool {
@@ -52,14 +53,11 @@ func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
 			secret.FromK8sSecret.SecretName,
 			fmt.Sprintf("-o jsonpath={.data.%s}", secret.FromK8sSecret.SecretKey),
 		}
+		log.Tracef("command: kubectl %s", strings.Join(kubectlArgs, " "))
 		k8sCmd := exec.CommandContext(ctx, "kubectl", kubectlArgs...)
-		err := k8sCmd.Start()
+		err := k8sCmd.Run()
 		if err != nil {
 			return "", logger.ErrorfAsError(log, "error spawning kubectl: %s", err)
-		}
-		err = k8sCmd.Wait()
-		if err != nil {
-			return "", logger.ErrorfAsError(log, "error waiting for kubectl: %s", err)
 		}
 		b64Bytes, err := k8sCmd.Output()
 		if err != nil {

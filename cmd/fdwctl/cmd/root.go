@@ -29,7 +29,7 @@ func init() {
 	cobra.OnInitialize(initCommand, initConfig)
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "location of program configuration file")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "logformat", logger.TextFormat, "log output format [text, json, elastic]")
-	rootCmd.PersistentFlags().StringVar(&logLevel, "loglevel", logger.TraceLevel, "log message level [trace, debug, info, warn, error, fatal, panic]")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "loglevel", logger.DebugLevel, "log message level [trace, debug, info, warn, error, fatal, panic]")
 	rootCmd.PersistentFlags().StringVar(&connectionString, "connection", "", "database connection string")
 	rootCmd.PersistentFlags().BoolVar(&noLogo, "nologo", false, "suppress program name and version message")
 	rootCmd.AddCommand(listCmd)

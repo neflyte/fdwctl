@@ -72,7 +72,7 @@ func connectionStringWithSecret(connURL *url.URL, secret model.Secret) string {
 	secretValue, err := GetSecret(context.Background(), secret)
 	if err != nil {
 		log.Errorf("error getting secret value: %s; returning connection string as-is", err)
-		log.Tracef("returning %s", connURL.String())
+		log.Tracef("returning %s", logger.SanitizedURL(connURL))
 		return connURL.String()
 	}
 	connURL.User = url.UserPassword(connURL.User.Username(), secretValue)
@@ -109,13 +109,11 @@ func ResolveConnectionString(connStr string, secret *model.Secret) string {
 		connMap := configmap.New()
 		matches := pgConnectionStringRE.FindAllStringSubmatch(connStr, -1)
 		for _, match := range matches {
-			log.Tracef("match: %#v", match)
 			connMap.Set(match[1], match[2])
 		}
 		// Now we can try to construct an URL-style string. First we see if there
 		// is enough information to do so
 		if mapContainsKeys(connMap, pgConnectionFields...) {
-			log.Trace("connMap has enough keys")
 			// Build the url.URL host string
 			urlHost := fmt.Sprintf("%s:%s", connMap.GetString(pgConnHost), connMap.GetString(pgConnPort))
 			// Build the query string
