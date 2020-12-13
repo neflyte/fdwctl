@@ -383,35 +383,33 @@ func ImportSchema(ctx context.Context, dbConnection *sql.DB, serverName string, 
 		return err
 	}
 	// If there are permissions to configure then configure them
-	if len(schema.SchemaGrants.Users) > 0 {
-		for _, user := range schema.SchemaGrants.Users {
-			log.Debugf("applying grants to schema %s for user %s", schema.LocalSchema, user)
-			// GRANT USAGE ON SCHEMA xxxx TO yyyy
-			sb := new(strings.Builder)
-			sb.WriteString("GRANT USAGE ON SCHEMA ")
-			sb.WriteString(schema.LocalSchema)
-			sb.WriteString(" TO ")
-			sb.WriteString(user)
-			query := sb.String()
-			log.Tracef("query: %s", query)
-			_, err = dbConnection.Exec(query)
-			if err != nil {
-				log.Errorf("error granting usage to local user: %s", err)
-				return err
-			}
-			// GRANT SELECT ON ALL TABLES IN SCHEMA xxxx TO yyyy
-			sb = new(strings.Builder)
-			sb.WriteString("GRANT SELECT ON ALL TABLES IN SCHEMA ")
-			sb.WriteString(schema.LocalSchema)
-			sb.WriteString(" TO ")
-			sb.WriteString(user)
-			query = sb.String()
-			log.Tracef("query: %s", query)
-			_, err = dbConnection.Exec(query)
-			if err != nil {
-				log.Errorf("error granting select to local user: %s", err)
-				return err
-			}
+	for _, user := range schema.SchemaGrants.Users {
+		log.Debugf("applying grants to schema %s for user %s", schema.LocalSchema, user)
+		// GRANT USAGE ON SCHEMA xxxx TO yyyy
+		sb := new(strings.Builder)
+		sb.WriteString("GRANT USAGE ON SCHEMA ")
+		sb.WriteString(schema.LocalSchema)
+		sb.WriteString(" TO ")
+		sb.WriteString(user)
+		query := sb.String()
+		log.Tracef("query: %s", query)
+		_, err = dbConnection.Exec(query)
+		if err != nil {
+			log.Errorf("error granting usage to local user: %s", err)
+			return err
+		}
+		// GRANT SELECT ON ALL TABLES IN SCHEMA xxxx TO yyyy
+		sb = new(strings.Builder)
+		sb.WriteString("GRANT SELECT ON ALL TABLES IN SCHEMA ")
+		sb.WriteString(schema.LocalSchema)
+		sb.WriteString(" TO ")
+		sb.WriteString(user)
+		query = sb.String()
+		log.Tracef("query: %s", query)
+		_, err = dbConnection.Exec(query)
+		if err != nil {
+			log.Errorf("error granting select to local user: %s", err)
+			return err
 		}
 	}
 	return nil

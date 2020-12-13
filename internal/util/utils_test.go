@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 )
@@ -30,4 +31,21 @@ func closeSQLMock(t *testing.T, db *sql.DB) {
 			t.Fail()
 		}
 	}
+}
+
+func TestUnit_StringCoalesce_Nominal(t *testing.T) {
+	expected := " foo "
+	actual := StringCoalesce("", " ", " foo ", "bar")
+	require.Equal(t, expected, actual)
+}
+
+func TestUnit_StringCoalesce_SpacesAndEmptyStrings(t *testing.T) {
+	expected := ""
+	actual := StringCoalesce(" ", "", "   ", "", "", " ")
+	require.Equal(t, expected, actual)
+}
+
+func TestUnit_StartsWithNumber(t *testing.T) {
+	require.True(t, StartsWithNumber("1NightInRio"))
+	require.False(t, StartsWithNumber("TwoDaysInLA"))
 }
