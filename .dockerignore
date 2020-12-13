@@ -1,2 +1,7 @@
 .idea
 testdata
+coverage
+media
+*.md
+LICENSE
+Makefile
