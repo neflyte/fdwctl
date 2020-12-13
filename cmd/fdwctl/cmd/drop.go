@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -25,25 +24,25 @@ var (
 	dropExtensionCmd = &cobra.Command{
 		Use:   "extension <extension name>",
 		Short: "Drop a PG extension (usually postgres_fdw)",
-		RunE:  dropExtension,
+		Run:   dropExtension,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	dropServerCmd = &cobra.Command{
 		Use:   "server <server name>",
 		Short: "Drop a foreign server",
-		RunE:  dropServer,
+		Run:   dropServer,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	dropUsermapCmd = &cobra.Command{
 		Use:   "usermap <server name> <local user>",
 		Short: "Drop a user mapping for a foreign server",
-		RunE:  dropUsermap,
+		Run:   dropUsermap,
 		Args:  cobra.MinimumNArgs(dropServerCmdMinArgCount),
 	}
 	dropSchemaCmd = &cobra.Command{
 		Use:   "schema <schema name>",
 		Short: "Drop a schema",
-		RunE:  dropSchema,
+		Run:   dropSchema,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	cascadeDrop   bool
@@ -75,7 +74,7 @@ func postDoDrop(cmd *cobra.Command, _ []string) {
 	database.CloseConnection(cmd.Context(), dbConnection)
 }
 
-func dropExtension(cmd *cobra.Command, args []string) error {
+func dropExtension(cmd *cobra.Command, args []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "dropExtension")
 	dropExtName := strings.TrimSpace(args[0])
@@ -84,37 +83,35 @@ func dropExtension(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		log.Errorf("error dropping extension %s: %s", dropExtName, err)
-		return err
+		return
 	}
 	log.Infof("extension %s dropped", dropExtName)
-	return nil
 }
 
-func dropServer(cmd *cobra.Command, args []string) error {
+func dropServer(cmd *cobra.Command, args []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "dropServer")
 	dsServerName := strings.TrimSpace(args[0])
 	err := util.DropServer(cmd.Context(), dbConnection, dsServerName, cascadeDrop)
 	if err != nil {
 		log.Errorf("error dropping server: %s", err)
-		return err
+		return
 	}
 	log.Infof("server %s dropped", dsServerName)
-	return nil
 }
 
-func dropUsermap(cmd *cobra.Command, args []string) error {
+func dropUsermap(cmd *cobra.Command, args []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "dropUsermap")
 	duServerName := strings.TrimSpace(args[0])
 	if duServerName == "" {
 		log.Errorf("server name is required")
-		return fmt.Errorf("server name is required")
+		return
 	}
 	duLocalUser := strings.TrimSpace(args[1])
 	if duLocalUser == "" {
 		log.Errorf("local user name is required")
-		return fmt.Errorf("local user name is required")
+		return
 	}
 	err := util.DropUserMap(cmd.Context(), dbConnection, model.UserMap{
 		ServerName: duServerName,
@@ -122,27 +119,25 @@ func dropUsermap(cmd *cobra.Command, args []string) error {
 	}, dropLocalUser)
 	if err != nil {
 		log.Errorf("error dropping user mapping: %s", err)
-		return err
+		return
 	}
 	log.Infof("user mapping for %s dropped", duLocalUser)
-	return nil
 }
 
-func dropSchema(cmd *cobra.Command, args []string) error {
+func dropSchema(cmd *cobra.Command, args []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "dropSchema")
 	dsSchemaName := strings.TrimSpace(args[0])
 	if dsSchemaName == "" {
 		log.Errorf("schema name is required")
-		return fmt.Errorf("schema name is required")
+		return
 	}
 	err := util.DropSchema(cmd.Context(), dbConnection, model.Schema{
 		LocalSchema: dsSchemaName,
 	}, cascadeDrop)
 	if err != nil {
 		log.Errorf("error dropping schema: %s", err)
-		return err
+		return
 	}
 	log.Infof("schema %s dropped", dsSchemaName)
-	return nil
 }

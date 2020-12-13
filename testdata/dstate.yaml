@@ -1,7 +1,7 @@
 # fdwctl desired state config
 #
-#FDWConnection: "postgres://postgres@localhost:5432/fdw?sslmode=disable"
-FDWConnection: "host=localhost port=5432 dbname=fdw user=postgres sslmode=disable"
+#FDWConnection: "postgres://fdw@localhost:5432/fdw?sslmode=disable"
+FDWConnection: "host=localhost port=5432 dbname=fdw user=fdw sslmode=disable"
 FDWConnectionSecret:
   value: "passw0rd"
 DesiredState:
@@ -13,10 +13,6 @@ DesiredState:
       port: 5432
       db: remotedb
       UserMap:
-        - localuser: postgres
-          remoteuser: remoteuser
-          remotesecret:
-            value: "r3m0TE!"
         - localuser: fdw
           remoteuser: remoteuser
           remotesecret:
@@ -25,15 +21,6 @@ DesiredState:
         - localschema: remotedb
           remoteschema: public
           importenums: true
-          enumconnection: "postgres://postgres@localhost:15432/remotedb?sslmode=disable"
+          enumconnection: "postgres://remoteuser@localhost:15432/remotedb?sslmode=disable"
           enumsecret:
-            value: "passw0rd"
-          Grants:
-            - user: postgres
-              Permissions:
-                usage: true
-                select: true
-            - user: fdw
-              Permissions:
-                usage: true
-                select: true
+            value: "r3m0TE!"

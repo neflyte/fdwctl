@@ -2,23 +2,25 @@ package util
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"strings"
+
 	"github.com/elgris/sqrl"
-	"github.com/jmoiron/sqlx"
+
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
-	"strings"
 )
 
-func GetServers(ctx context.Context, dbConnection *sqlx.DB) ([]model.ForeignServer, error) {
+func GetServers(ctx context.Context, dbConnection *sql.DB) ([]model.ForeignServer, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetServers")
 	query, _, err := sqrl.
 		Select(
-			"fs.foreign_server_name AS foreign_server_name",
-			"fs.foreign_data_wrapper_name AS foreign_data_wrapper_name",
-			"fs.authorization_identifier AS authorization_identifier",
+			"fs.foreign_server_name",
+			"fs.foreign_data_wrapper_name",
+			"fs.authorization_identifier",
 			"fsoh.option_value AS hostname",
 			"fsop.option_value::int AS port",
 			"fsod.option_value AS dbname",
@@ -32,21 +34,25 @@ func GetServers(ctx context.Context, dbConnection *sqlx.DB) ([]model.ForeignServ
 		return nil, err
 	}
 	log.Tracef("query: %s", query)
-	rows, err := dbConnection.QueryxContext(ctx, query)
+	rows, err := dbConnection.Query(query)
 	if err != nil {
 		log.Errorf("error querying for servers: %s", err)
 		return nil, err
 	}
 	defer database.CloseRows(ctx, rows)
 	servers := make([]model.ForeignServer, 0)
-	server := new(model.ForeignServer)
 	for rows.Next() {
-		err = rows.StructScan(server)
+		server := new(model.ForeignServer)
+		err = rows.Scan(&server.Name, &server.Wrapper, &server.Owner, &server.Host, &server.Port, &server.DB)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
 		servers = append(servers, *server)
+	}
+	if rows.Err() != nil {
+		log.Errorf("error iterating result rows: %s", rows.Err())
+		return nil, rows.Err()
 	}
 	return servers, nil
 }
@@ -60,7 +66,7 @@ func FindForeignServer(foreignServers []model.ForeignServer, serverName string) 
 	return nil
 }
 
-func DropServer(ctx context.Context, dbConnection *sqlx.DB, servername string, cascade bool) error {
+func DropServer(ctx context.Context, dbConnection *sql.DB, servername string, cascade bool) error {
 	log := logger.Log(ctx).
 		WithField("function", "DropServer")
 	if servername == "" {
@@ -71,7 +77,7 @@ func DropServer(ctx context.Context, dbConnection *sqlx.DB, servername string, c
 		query = fmt.Sprintf("%s CASCADE", query)
 	}
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.ExecContext(ctx, query)
+	_, err := dbConnection.Exec(query)
 	if err != nil {
 		log.Errorf("error dropping server: %s", err)
 		return err
@@ -79,7 +85,7 @@ func DropServer(ctx context.Context, dbConnection *sqlx.DB, servername string, c
 	return nil
 }
 
-func CreateServer(ctx context.Context, dbConnection *sqlx.DB, server model.ForeignServer) error {
+func CreateServer(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer) error {
 	log := logger.Log(ctx).
 		WithField("function", "CreateServer")
 	query := fmt.Sprintf(
@@ -90,7 +96,7 @@ func CreateServer(ctx context.Context, dbConnection *sqlx.DB, server model.Forei
 		server.DB,
 	)
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.ExecContext(ctx, query)
+	_, err := dbConnection.Exec(query)
 	if err != nil {
 		log.Errorf("error creating server: %s", err)
 		return err
@@ -98,7 +104,7 @@ func CreateServer(ctx context.Context, dbConnection *sqlx.DB, server model.Forei
 	return nil
 }
 
-func UpdateServer(ctx context.Context, dbConnection *sqlx.DB, server model.ForeignServer) error {
+func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer) error {
 	log := logger.Log(ctx).
 		WithField("function", "UpdateServer")
 	// Edit server hostname, port, and dbname
@@ -115,7 +121,7 @@ func UpdateServer(ctx context.Context, dbConnection *sqlx.DB, server model.Forei
 	}
 	query = fmt.Sprintf("%s %s )", query, strings.Join(opts, ","))
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.ExecContext(ctx, query)
+	_, err := dbConnection.Exec(query)
 	if err != nil {
 		log.Errorf("error updating server: %s", err)
 		return err
@@ -124,12 +130,12 @@ func UpdateServer(ctx context.Context, dbConnection *sqlx.DB, server model.Forei
 	return nil
 }
 
-func UpdateServerName(ctx context.Context, dbConnection *sqlx.DB, server model.ForeignServer, newServerName string) error {
+func UpdateServerName(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer, newServerName string) error {
 	log := logger.Log(ctx).
 		WithField("function", "UpdateServerName")
 	query := fmt.Sprintf("ALTER SERVER %s RENAME TO %s", server.Name, newServerName)
 	log.Tracef("query: %s", query)
-	_, err := dbConnection.ExecContext(ctx, query)
+	_, err := dbConnection.Exec(query)
 	if err != nil {
 		log.Errorf("error renaming server object: %s", err)
 		return err

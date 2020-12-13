@@ -138,38 +138,17 @@ func ErrorfAsError(log logrus.FieldLogger, format string, args ...interface{}) e
 	return errors.New(message)
 }
 
-// SanitizedURL returns a parsed URL string with user credentials removed
-//
-// Input argument 'arg' can be:
-//   - string (a string representation of a URL)
-//   - url.URL (an object representation of a URL)
-//
-// Output will be the sanitized string; "(unknown)" if any other type is supplied
-func SanitizedURL(arg interface{}) string {
+// SanitizedURLString returns a parsed URL string with user credentials removed
+func SanitizedURLString(urlWithCreds string) string {
 	log := Log().
-		WithField("function", "SanitizedURL")
-	switch obj := arg.(type) {
-	case string:
-		clone, err := url.Parse(obj)
-		if err != nil {
-			log.Errorf("unable to clone url from string: %s", err)
-			return obj
-		}
-		if clone.User != nil {
-			clone.User = url.User(clone.User.Username())
-		}
-		return clone.String()
-	case url.URL:
-		clone, err := url.Parse(obj.String())
-		if err != nil {
-			log.Errorf("unable to clone url from url.URL: %s", err)
-			return obj.String()
-		}
-		if clone.User != nil {
-			clone.User = url.User(clone.User.Username())
-		}
-		return clone.String()
-	default:
-		return "(unknown)"
+		WithField("function", "SanitizedURLString")
+	clone, err := url.Parse(urlWithCreds)
+	if err != nil {
+		log.Errorf("unable to clone url: %s", err)
+		return urlWithCreds
 	}
+	if clone.User != nil {
+		clone.User = url.User(clone.User.Username())
+	}
+	return clone.String()
 }

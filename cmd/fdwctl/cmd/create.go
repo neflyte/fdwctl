@@ -22,24 +22,24 @@ var (
 	createServerCmd = &cobra.Command{
 		Use:   "server <server name>",
 		Short: "Create a foreign server",
-		RunE:  createServer,
+		Run:   createServer,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	createExtensionCmd = &cobra.Command{
 		Use:   "extension <extension name>",
 		Short: "Create a PG extension (usually postgres_fdw)",
-		RunE:  createExtension,
+		Run:   createExtension,
 		Args:  cobra.MinimumNArgs(1),
 	}
 	createUsermapCmd = &cobra.Command{
 		Use:   "usermap",
 		Short: "Create a user mapping for a foreign server",
-		RunE:  createUsermap,
+		Run:   createUsermap,
 	}
 	createSchemaCmd = &cobra.Command{
 		Use:   "schema",
 		Short: "Create (import) a schema from a foreign server",
-		RunE:  createSchema,
+		Run:   createSchema,
 	}
 	serverHost           string
 	serverPort           string
@@ -77,6 +77,7 @@ func init() {
 	createSchemaCmd.Flags().StringVar(&remoteSchemaName, "remoteschema", "", "the remote schema to import")
 	createSchemaCmd.Flags().BoolVar(&importEnums, "importenums", false, "attempt to auto-create ENUMs locally before import")
 	createSchemaCmd.Flags().StringVar(&importEnumConnection, "enumconnection", "", "connection string of database to import enums from")
+	// TODO: Add a flag to accept a list of users for grants
 	_ = createSchemaCmd.MarkFlagRequired("localschema")
 	_ = createSchemaCmd.MarkFlagRequired("servername")
 	_ = createSchemaCmd.MarkFlagRequired("remoteschema")
@@ -102,7 +103,7 @@ func postDoCreate(cmd *cobra.Command, _ []string) {
 	database.CloseConnection(cmd.Context(), dbConnection)
 }
 
-func createExtension(cmd *cobra.Command, args []string) error {
+func createExtension(cmd *cobra.Command, args []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "createExtension")
 	extName := strings.TrimSpace(args[0])
@@ -111,13 +112,12 @@ func createExtension(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		log.Errorf("error creating extension %s: %s", extName, err)
-		return err
+		return
 	}
 	log.Infof("extension %s created", extName)
-	return nil
 }
 
-func createServer(cmd *cobra.Command, args []string) error {
+func createServer(cmd *cobra.Command, args []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "createServer")
 	serverSlug := strings.TrimSpace(args[0])
@@ -134,7 +134,7 @@ func createServer(cmd *cobra.Command, args []string) error {
 	portInt, err := strconv.Atoi(serverPort)
 	if err != nil {
 		log.Errorf("error converting port to integer: %s", err)
-		return err
+		return
 	}
 	err = util.CreateServer(cmd.Context(), dbConnection, model.ForeignServer{
 		Name: serverSlug,
@@ -144,19 +144,18 @@ func createServer(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		log.Errorf("error creating server: %s", err)
-		return err
+		return
 	}
 	log.Infof("server %s created", serverSlug)
-	return nil
 }
 
-func createUsermap(cmd *cobra.Command, _ []string) error {
+func createUsermap(cmd *cobra.Command, _ []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "createUsermap")
 	err := util.EnsureUser(cmd.Context(), dbConnection, localUser, remotePassword)
 	if err != nil {
 		log.Errorf("error ensuring local user exists: %s", err)
-		return err
+		return
 	}
 	err = util.CreateUserMap(cmd.Context(), dbConnection, model.UserMap{
 		ServerName: serverName,
@@ -168,13 +167,12 @@ func createUsermap(cmd *cobra.Command, _ []string) error {
 	})
 	if err != nil {
 		log.Errorf("error creating user mapping: %s", err)
-		return err
+		return
 	}
 	log.Infof("user mapping %s -> %s created", localUser, remoteUser)
-	return nil
 }
 
-func createSchema(cmd *cobra.Command, _ []string) error {
+func createSchema(cmd *cobra.Command, _ []string) {
 	log := logger.Log(cmd.Context()).
 		WithField("function", "createSchema")
 	err := util.ImportSchema(cmd.Context(), dbConnection, csServerName, model.Schema{
@@ -183,11 +181,13 @@ func createSchema(cmd *cobra.Command, _ []string) error {
 		RemoteSchema:   remoteSchemaName,
 		ImportENUMs:    importEnums,
 		ENUMConnection: importEnumConnection,
+		SchemaGrants: model.Grants{
+			Users: make([]string, 0),
+		},
 	})
 	if err != nil {
 		log.Errorf("error importing foreign schema: %s", err)
-		return err
+		return
 	}
 	log.Infof("foreign schema %s imported", remoteSchemaName)
-	return nil
 }

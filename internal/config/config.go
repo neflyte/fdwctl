@@ -58,7 +58,7 @@ func UserConfigFile() string {
 	log := logger.Log().
 		WithField("function", "UserConfigFile")
 	xdgConfigHome, ok := os.LookupEnv("XDG_CONFIG_HOME")
-	if xdgConfigHome == "" || !ok {
+	if !ok || xdgConfigHome == "" {
 		homedir, err := os.UserHomeDir()
 		if err != nil {
 			log.Errorf("error getting user home directory: %s", err)
@@ -97,7 +97,7 @@ func Load(ac *appConfig, fileName string) error {
 	if err != nil {
 		return logger.ErrorfAsError(log, "error unmarshaling config: %s", err)
 	}
-	log.Tracef("loaded config: %#v", ac)
+	log.Debugf("loaded config: %#v", ac)
 	return nil
 }
 

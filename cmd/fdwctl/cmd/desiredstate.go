@@ -2,7 +2,8 @@ package cmd
 
 import (
 	"context"
-	"github.com/jmoiron/sqlx"
+	"database/sql"
+
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
@@ -20,7 +21,12 @@ var (
 		PersistentPostRun: postDoDesiredState,
 		RunE:              doDesiredState,
 	}
+	desiredStateRecreateSchemas = false
 )
+
+func init() {
+	desiredStateCmd.Flags().BoolVar(&desiredStateRecreateSchemas, "recreateschemas", false, "flag indicating that foreign schemas should be re-created")
+}
 
 func preDoDesiredState(cmd *cobra.Command, _ []string) error {
 	var err error
@@ -115,7 +121,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func applyExtensions(ctx context.Context, dbConnection *sqlx.DB) error {
+func applyExtensions(ctx context.Context, dbConnection *sql.DB) error {
 	log := logger.Log(ctx).
 		WithField("function", "applyExtensions")
 	// List extensions in DB
@@ -146,7 +152,7 @@ func applyExtensions(ctx context.Context, dbConnection *sqlx.DB) error {
 	return nil
 }
 
-func applyUserMaps(ctx context.Context, dbConnection *sqlx.DB, server model.ForeignServer) error {
+func applyUserMaps(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer) error {
 	log := logger.Log(ctx).
 		WithField("function", "applyUserMaps")
 	// List Usermaps for this server in the DB
@@ -185,9 +191,18 @@ func applyUserMaps(ctx context.Context, dbConnection *sqlx.DB, server model.Fore
 	}
 	// Update usermaps that are already there
 	for _, usermapToUpdate := range usModify {
+		usermapToUpdate.ServerName = dsServer.Name
 		dbUserMap := util.FindUserMap(dbServerUsermaps, usermapToUpdate.LocalUser)
 		if dbUserMap == nil {
 			return logger.ErrorfAsError(log, "cannot find user mapping for local user %s", usermapToUpdate.LocalUser)
+		}
+		if util.SecretIsDefined(usermapToUpdate.RemoteSecret) {
+			remoteSecret := ""
+			remoteSecret, err = util.GetSecret(ctx, usermapToUpdate.RemoteSecret)
+			if err != nil {
+				return logger.ErrorfAsError(log, "error getting secret value: %s", err)
+			}
+			usermapToUpdate.RemoteSecret.Value = remoteSecret
 		}
 		if !usermapToUpdate.Equals(*dbUserMap) {
 			err = util.UpdateUserMap(ctx, dbConnection, usermapToUpdate)
@@ -203,11 +218,11 @@ func applyUserMaps(ctx context.Context, dbConnection *sqlx.DB, server model.Fore
 	return nil
 }
 
-func applySchemas(ctx context.Context, dbConnection *sqlx.DB, server model.ForeignServer) error {
+func applySchemas(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer) error {
 	log := logger.Log(ctx).
 		WithField("function", "applySchemas")
 	// Get DB remote schemas
-	dbSchemas, err := util.GetSchemas(ctx, dbConnection)
+	dbSchemas, err := util.GetSchemasForServer(ctx, dbConnection, server.Name)
 	if err != nil {
 		log.Errorf("error getting remote schemas: %s", err)
 		return err
@@ -236,35 +251,24 @@ func applySchemas(ctx context.Context, dbConnection *sqlx.DB, server model.Forei
 	}
 	// Drop + Re-Import all other schemas
 	for _, schemaToModify := range schModify {
-		// Drop
-		err = util.DropSchema(ctx, dbConnection, schemaToModify, true)
-		if err != nil {
-			log.Errorf("error dropping local schema %s: %s", schemaToModify.LocalSchema, err)
-			return err
-		}
-		// Import
-		err = util.ImportSchema(ctx, dbConnection, server.Name, schemaToModify)
-		if err != nil {
-			log.Errorf("error importing into local schema %s: %s", schemaToModify.LocalSchema, err)
-			return err
-		}
-		// Done
-		log.Infof("foreign schema %s re-imported", schemaToModify.RemoteSchema)
-	}
-	// Process permission grants
-	grantSchemas := make([]model.Schema, 0)
-	grantSchemas = append(grantSchemas, schAdd...)
-	grantSchemas = append(grantSchemas, schModify...)
-	log.Tracef("len(grantSchemas)=%d", len(grantSchemas))
-	for _, grantSchema := range grantSchemas {
-		log.Debugf("applying permissions for schema %s", grantSchema.LocalSchema)
-		grantSchema.ServerName = server.Name
-		err = util.PerformGrants(ctx, dbConnection, grantSchema)
-		if err != nil {
-			log.Errorf("error applying permissions: %s", err)
-			return err
+		if desiredStateRecreateSchemas {
+			// Drop
+			err = util.DropSchema(ctx, dbConnection, schemaToModify, true)
+			if err != nil {
+				log.Errorf("error dropping local schema %s: %s", schemaToModify.LocalSchema, err)
+				return err
+			}
+			// Import
+			err = util.ImportSchema(ctx, dbConnection, server.Name, schemaToModify)
+			if err != nil {
+				log.Errorf("error importing into local schema %s: %s", schemaToModify.LocalSchema, err)
+				return err
+			}
+			// Done
+			log.Infof("foreign schema %s re-imported", schemaToModify.RemoteSchema)
+		} else {
+			log.Infof("foreign schema %s exists; will not re-create it", schemaToModify.RemoteSchema)
 		}
 	}
-	log.Debug("done applying permissions")
 	return nil
 }

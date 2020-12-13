@@ -6,12 +6,14 @@ package util
 import (
 	"context"
 	"fmt"
-	"github.com/neflyte/configmap"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/neflyte/configmap"
+
+	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/model"
 )
 
 const (
@@ -56,13 +58,13 @@ func StartsWithNumber(str string) bool {
 
 // mapContainsKeys determines if the supplied map (haystack) contains all the supplied keys (needles)
 func mapContainsKeys(haystack configmap.ConfigMap, needles ...string) bool {
-	needlecount := 0
+	found := 0
 	for _, needle := range needles {
 		if haystack.Has(needle) {
-			needlecount++
+			found++
 		}
 	}
-	return needlecount == len(needles)
+	return found == len(needles)
 }
 
 // connectionStringWithSecret returns a URL populated with a credential obtained using the supplied secret configuration
@@ -72,7 +74,7 @@ func connectionStringWithSecret(connURL *url.URL, secret model.Secret) string {
 	secretValue, err := GetSecret(context.Background(), secret)
 	if err != nil {
 		log.Errorf("error getting secret value: %s; returning connection string as-is", err)
-		log.Tracef("returning %s", logger.SanitizedURL(connURL))
+		log.Tracef("returning %s", connURL.String())
 		return connURL.String()
 	}
 	connURL.User = url.UserPassword(connURL.User.Username(), secretValue)
@@ -109,11 +111,13 @@ func ResolveConnectionString(connStr string, secret *model.Secret) string {
 		connMap := configmap.New()
 		matches := pgConnectionStringRE.FindAllStringSubmatch(connStr, -1)
 		for _, match := range matches {
+			log.Tracef("match: %#v", match)
 			connMap.Set(match[1], match[2])
 		}
 		// Now we can try to construct an URL-style string. First we see if there
 		// is enough information to do so
 		if mapContainsKeys(connMap, pgConnectionFields...) {
+			log.Trace("connMap has enough keys")
 			// Build the url.URL host string
 			urlHost := fmt.Sprintf("%s:%s", connMap.GetString(pgConnHost), connMap.GetString(pgConnPort))
 			// Build the query string

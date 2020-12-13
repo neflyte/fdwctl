@@ -6,32 +6,33 @@ package database
 import (
 	"context"
 	"database/sql"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+
+	_ "github.com/jackc/pgx/v4/stdlib"
+
 	"github.com/neflyte/fdwctl/internal/logger"
 )
 
 // GetConnection returns an established connection to a database using the supplied connection string
-func GetConnection(ctx context.Context, connectionString string) (*sqlx.DB, error) {
+func GetConnection(ctx context.Context, connectionString string) (*sql.DB, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetConnection")
 	if connectionString == "" {
 		return nil, logger.ErrorfAsError(log, "database connection string is required")
 	}
-	log.Tracef("opening database connection to %s", logger.SanitizedURL(connectionString))
-	db, err := sql.Open("postgres", connectionString)
+	log.Debugf("opening database connection to %s", logger.SanitizedURLString(connectionString))
+	conn, err := sql.Open("pgx", connectionString)
 	if err != nil {
 		return nil, logger.ErrorfAsError(log, "error connecting to database: %s", err)
 	}
-	return sqlx.NewDb(db, "postgres"), nil
+	return conn, err
 }
 
 // CloseConnection closes a database connection and logs any resulting errors
-func CloseConnection(ctx context.Context, conn *sqlx.DB) {
+func CloseConnection(ctx context.Context, conn *sql.DB) {
 	log := logger.Log(ctx).
 		WithField("function", "CloseConnection")
 	if conn != nil {
-		log.Trace("closing database connection")
+		log.Debug("closing database connection")
 		err := conn.Close()
 		if err != nil {
 			log.Errorf("error closing database connection: %s", err)
@@ -39,15 +40,15 @@ func CloseConnection(ctx context.Context, conn *sqlx.DB) {
 	}
 }
 
-// CloseRows closes a Rows object and logs any resulting errors
-func CloseRows(ctx context.Context, rows *sqlx.Rows) {
+// CloseRows closes a database Rows object and logs any resulting errors
+func CloseRows(ctx context.Context, rows *sql.Rows) {
 	log := logger.Log(ctx).
 		WithField("function", "CloseRows")
 	if rows != nil {
-		log.Trace("closing rows")
+		log.Debug("closing result rows")
 		err := rows.Close()
 		if err != nil {
-			log.Errorf("error closing rows: %s", err)
+			log.Errorf("error closing result rows: %s", err)
 		}
 	}
 }

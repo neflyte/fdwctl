@@ -1,2 +1,2 @@
 ---
-FDWConnection: "postgres://postgres:passw0rd@localhost:5432/fdw?sslmode=disable"
+FDWConnection: "postgres://fdw:passw0rd@localhost:5432/fdw?sslmode=disable"
