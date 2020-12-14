@@ -154,3 +154,38 @@ func TestUnit_DropExtension_ExecError(t *testing.T) {
 	closeSQLMock(t, db)
 	require.Nil(t, mock.ExpectationsWereMet())
 }
+
+func TestUnit_DiffExtensions_DesiredStateReplacesAll(t *testing.T) {
+	dStateExts := []model.Extension{
+		{Name: "fdw_one", Version: "1.0.0"},
+		{Name: "two_fdw", Version: "0.2.1"},
+	}
+	dbExts := []model.Extension{
+		{Name: "postgres_fdw", Version: "1.0.0"},
+	}
+	expectedRemove := []model.Extension{dbExts[0]}
+	expectedAdd := []model.Extension{dStateExts[0], dStateExts[1]}
+
+	actualRemove, actualAdd := DiffExtensions(dStateExts, dbExts)
+
+	require.Equal(t, expectedRemove, actualRemove)
+	require.Equal(t, expectedAdd, actualAdd)
+}
+
+func TestUnit_DiffExtensions_DBAlreadyHasDesiredState(t *testing.T) {
+	dStateExts := []model.Extension{
+		{Name: "fdw_one", Version: "1.0.0"},
+		{Name: "two_fdw", Version: "0.2.1"},
+	}
+	dbExts := []model.Extension{
+		{Name: "fdw_one", Version: "1.0.0"},
+		{Name: "two_fdw", Version: "0.2.1"},
+	}
+	expectedRemove := make([]model.Extension, 0)
+	expectedAdd := make([]model.Extension, 0)
+
+	actualRemove, actualAdd := DiffExtensions(dStateExts, dbExts)
+
+	require.Equal(t, expectedRemove, actualRemove)
+	require.Equal(t, expectedAdd, actualAdd)
+}

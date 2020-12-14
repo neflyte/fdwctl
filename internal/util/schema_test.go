@@ -133,3 +133,81 @@ func TestUnit_ensureSchema_CreateSchemaError(t *testing.T) {
 	closeSQLMock(t, db)
 	require.Nil(t, mock.ExpectationsWereMet())
 }
+
+func TestUnit_getEnums_Nominal(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer closeSQLMock(t, db)
+
+	mock.ExpectQuery("SELECT typname FROM pg_type WHERE typtype = \\$1").
+		WithArgs("e").
+		WillReturnRows(
+			sqlmock.NewRows([]string{"typname"}).
+				AddRow("my-enum"),
+		).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+
+	expected := []string{"my-enum"}
+	actual, err := getEnums(context.Background(), db)
+
+	require.Nil(t, err)
+	require.NotNil(t, actual)
+	require.Equal(t, expected, actual)
+	closeSQLMock(t, db)
+	require.Nil(t, mock.ExpectationsWereMet())
+}
+
+func TestUnit_getSchemaEnumsUsedInTables_Nominal(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer closeSQLMock(t, db)
+
+	schemaName := "my-schema"
+
+	mock.ExpectQuery(
+		"SELECT DISTINCT cuu.udt_name FROM information_schema.column_udt_usage cuu "+
+			"JOIN pg_type t ON t.typname = cuu.udt_name WHERE \\(t.typtype = \\$1 AND cuu.table_schema = \\$2\\)",
+	).
+		WithArgs("e", schemaName).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"cuu.udt_name"}).
+				AddRow("my-enum"),
+		).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+
+	expected := []string{"my-enum"}
+	actual, err := getSchemaEnumsUsedInTables(context.Background(), db, schemaName)
+	require.Nil(t, err)
+	require.NotNil(t, actual)
+	require.Equal(t, expected, actual)
+	closeSQLMock(t, db)
+	require.Nil(t, mock.ExpectationsWereMet())
+}
+
+func TestUnit_getEnumStrings_Nominal(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer closeSQLMock(t, db)
+
+	enumType := "e"
+
+	mock.ExpectQuery(
+		"SELECT e.enumlabel FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid " +
+			"WHERE t.typname = \\$1 ORDER BY e.enumsortorder ASC",
+	).
+		WithArgs(enumType).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"e.enumlabel"}).
+				AddRow("valueOne").
+				AddRow("valueTwo"),
+		).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+
+	expected := []string{"valueOne", "valueTwo"}
+	actual, err := getEnumStrings(context.Background(), db, enumType)
+	require.Nil(t, err)
+	require.NotNil(t, actual)
+	require.Equal(t, expected, actual)
+	closeSQLMock(t, db)
+	require.Nil(t, mock.ExpectationsWereMet())
+}
