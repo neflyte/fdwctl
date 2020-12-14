@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/neflyte/fdwctl/internal/model"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
@@ -208,6 +209,111 @@ func TestUnit_getEnumStrings_Nominal(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, actual)
 	require.Equal(t, expected, actual)
+	closeSQLMock(t, db)
+	require.Nil(t, mock.ExpectationsWereMet())
+}
+
+func TestUnit_GetSchemasForServer_Nominal_NoServerName(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer closeSQLMock(t, db)
+
+	queryResults := sqlmock.NewRows([]string{"ft.foreign_table_schema", "ft.foreign_server_name", "remote_schema"}).
+		AddRow("public", "my-server", "public").
+		AddRow("my-schema", "other-server", "public")
+
+	mock.ExpectQuery(
+		"SELECT DISTINCT ft.foreign_table_schema, ft.foreign_server_name, ftos.option_value AS remote_schema " +
+			"FROM information_schema.foreign_tables ft JOIN information_schema.foreign_table_options ftos ON " +
+			"ftos.foreign_table_schema = ft.foreign_table_schema " +
+			"AND ftos.foreign_table_catalog = ft.foreign_table_catalog " +
+			"AND ftos.foreign_table_name = ft.foreign_table_name " +
+			"AND ftos.option_name = 'schema_name'",
+	).
+		WillReturnRows(queryResults).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+
+	expected := []model.Schema{
+		{ServerName: "my-server", LocalSchema: "public", RemoteSchema: "public"},
+		{ServerName: "other-server", LocalSchema: "my-schema", RemoteSchema: "public"},
+	}
+
+	actual, err := GetSchemasForServer(context.Background(), db, "")
+	require.NotNil(t, actual)
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
+	closeSQLMock(t, db)
+	require.Nil(t, mock.ExpectationsWereMet())
+}
+
+func TestUnit_GetSchemasForServer_Nominal_WithServerName(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer closeSQLMock(t, db)
+
+	queryResults := sqlmock.NewRows([]string{"ft.foreign_table_schema", "ft.foreign_server_name", "remote_schema"}).
+		AddRow("my-schema", "other-server", "public")
+
+	mock.ExpectQuery(
+		"SELECT DISTINCT ft.foreign_table_schema, ft.foreign_server_name, ftos.option_value AS remote_schema " +
+			"FROM information_schema.foreign_tables ft JOIN information_schema.foreign_table_options ftos ON " +
+			"ftos.foreign_table_schema = ft.foreign_table_schema " +
+			"AND ftos.foreign_table_catalog = ft.foreign_table_catalog " +
+			"AND ftos.foreign_table_name = ft.foreign_table_name " +
+			"AND ftos.option_name = 'schema_name' WHERE ft.foreign_server_name = \\$1",
+	).
+		WithArgs("other-server").
+		WillReturnRows(queryResults).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+
+	expected := []model.Schema{
+		{ServerName: "other-server", LocalSchema: "my-schema", RemoteSchema: "public"},
+	}
+
+	actual, err := GetSchemasForServer(context.Background(), db, "other-server")
+	require.NotNil(t, actual)
+	require.Nil(t, err)
+	require.Equal(t, expected, actual)
+	closeSQLMock(t, db)
+	require.Nil(t, mock.ExpectationsWereMet())
+}
+
+func TestUnit_DropSchema_NoCascade(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer closeSQLMock(t, db)
+
+	schema := model.Schema{
+		ServerName:   "my-server",
+		LocalSchema:  "local-schema",
+		RemoteSchema: "remote-schema",
+	}
+
+	expectedSQL := fmt.Sprintf("DROP SCHEMA %s", schema.LocalSchema)
+	mock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectClose()
+
+	err := DropSchema(context.Background(), db, schema, false)
+	require.Nil(t, err)
+	closeSQLMock(t, db)
+	require.Nil(t, mock.ExpectationsWereMet())
+}
+
+func TestUnit_DropSchema_WithCascade(t *testing.T) {
+	db, mock := newSQLMock(t)
+	defer closeSQLMock(t, db)
+
+	schema := model.Schema{
+		ServerName:   "my-server",
+		LocalSchema:  "local-schema",
+		RemoteSchema: "remote-schema",
+	}
+
+	expectedSQL := fmt.Sprintf("DROP SCHEMA %s CASCADE", schema.LocalSchema)
+	mock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectClose()
+
+	err := DropSchema(context.Background(), db, schema, true)
+	require.Nil(t, err)
 	closeSQLMock(t, db)
 	require.Nil(t, mock.ExpectationsWereMet())
 }
