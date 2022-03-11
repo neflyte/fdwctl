@@ -89,7 +89,7 @@ func CreateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	log := logger.Log(ctx).
 		WithField("function", "CreateServer")
 	query := fmt.Sprintf(
-		"CREATE SERVER %s FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s')",
+		`CREATE SERVER "%s" FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s')`,
 		server.Name,
 		server.Host,
 		server.Port,
@@ -108,7 +108,7 @@ func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	log := logger.Log(ctx).
 		WithField("function", "UpdateServer")
 	// Edit server hostname, port, and dbname
-	query := fmt.Sprintf("ALTER SERVER %s OPTIONS (", server.Name)
+	query := fmt.Sprintf(`ALTER SERVER "%s" OPTIONS (`, server.Name)
 	opts := make([]string, 0)
 	if server.Host != "" {
 		opts = append(opts, fmt.Sprintf("SET host '%s'", server.Host))
@@ -133,7 +133,7 @@ func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 func UpdateServerName(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer, newServerName string) error {
 	log := logger.Log(ctx).
 		WithField("function", "UpdateServerName")
-	query := fmt.Sprintf("ALTER SERVER %s RENAME TO %s", server.Name, newServerName)
+	query := fmt.Sprintf(`ALTER SERVER "%s" RENAME TO "%s"`, server.Name, newServerName)
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {

@@ -45,7 +45,7 @@ func EnsureUser(ctx context.Context, dbConnection *sql.DB, userName string, user
 	}
 	if !userExists {
 		log.Debugf("user does not exist; creating")
-		query = fmt.Sprintf("CREATE USER %s WITH PASSWORD '%s'", userName, userPassword)
+		query = fmt.Sprintf(`CREATE USER "%s" WITH PASSWORD '%s'`, userName, userPassword)
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
 		if err != nil {
@@ -64,7 +64,7 @@ func DropUser(ctx context.Context, dbConnection *sql.DB, username string) error 
 	if username == "" {
 		return logger.ErrorfAsError(log, "user name is required")
 	}
-	query := fmt.Sprintf("DROP USER IF EXISTS %s", username)
+	query := fmt.Sprintf(`DROP USER IF EXISTS "%s"`, username)
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {

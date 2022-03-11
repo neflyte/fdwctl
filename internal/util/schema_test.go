@@ -34,7 +34,7 @@ func TestUnit_ensureSchema_SchemaDoesNotExist(t *testing.T) {
 	defer closeSQLMock(t, db)
 
 	schemaName := "my-schema"
-	createSchemaSQL := fmt.Sprintf("CREATE SCHEMA %s", schemaName)
+	createSchemaSQL := fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)
 
 	mock.ExpectQuery("SELECT 1 FROM information_schema.schemata WHERE schema_name = \\$1").
 		WithArgs(schemaName).
@@ -118,7 +118,7 @@ func TestUnit_ensureSchema_CreateSchemaError(t *testing.T) {
 	defer closeSQLMock(t, db)
 
 	schemaName := "my-schema"
-	createSchemaSQL := fmt.Sprintf("CREATE SCHEMA %s", schemaName)
+	createSchemaSQL := fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)
 
 	mock.ExpectQuery("SELECT 1 FROM information_schema.schemata WHERE schema_name = \\$1").
 		WithArgs(schemaName).
@@ -288,7 +288,7 @@ func TestUnit_DropSchema_NoCascade(t *testing.T) {
 		RemoteSchema: "remote-schema",
 	}
 
-	expectedSQL := fmt.Sprintf("DROP SCHEMA %s", schema.LocalSchema)
+	expectedSQL := fmt.Sprintf(`DROP SCHEMA "%s"`, schema.LocalSchema)
 	mock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 
@@ -308,7 +308,7 @@ func TestUnit_DropSchema_WithCascade(t *testing.T) {
 		RemoteSchema: "remote-schema",
 	}
 
-	expectedSQL := fmt.Sprintf("DROP SCHEMA %s CASCADE", schema.LocalSchema)
+	expectedSQL := fmt.Sprintf(`DROP SCHEMA "%s" CASCADE`, schema.LocalSchema)
 	mock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 

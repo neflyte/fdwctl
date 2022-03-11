@@ -89,7 +89,7 @@ func DiffExtensions(dStateExts []model.Extension, dbExts []model.Extension) (ext
 func CreateExtension(ctx context.Context, dbConnection *sql.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "CreateExtension")
-	_, err := dbConnection.Exec(fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS %s`, ext.Name))
+	_, err := dbConnection.Exec(fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS "%s"`, ext.Name))
 	if err != nil {
 		return logger.ErrorfAsError(log, "error creating extension %s: %s", ext.Name, err)
 	}
@@ -100,7 +100,7 @@ func CreateExtension(ctx context.Context, dbConnection *sql.DB, ext model.Extens
 func DropExtension(ctx context.Context, dbConnection *sql.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "DropExtension")
-	_, err := dbConnection.Exec(fmt.Sprintf(`DROP EXTENSION IF EXISTS %s`, ext.Name))
+	_, err := dbConnection.Exec(fmt.Sprintf(`DROP EXTENSION IF EXISTS "%s"`, ext.Name))
 	if err != nil {
 		return logger.ErrorfAsError(log, "error dropping extension %s: %s", ext.Name, err)
 	}

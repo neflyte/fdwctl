@@ -53,7 +53,7 @@ func ensureSchema(ctx context.Context, dbConnection *sql.DB, schemaName string) 
 	}
 	if !localSchemaExists {
 		log.Debug("schema does not exist; creating")
-		query = fmt.Sprintf("CREATE SCHEMA %s", schemaName)
+		query = fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
 		if err != nil {
@@ -277,7 +277,7 @@ func DropSchema(ctx context.Context, dbConnection *sql.DB, schema model.Schema, 
 	if schema.LocalSchema == "" {
 		return logger.ErrorfAsError(log, "local schema name is required")
 	}
-	query := fmt.Sprintf("DROP SCHEMA %s", schema.LocalSchema)
+	query := fmt.Sprintf(`DROP SCHEMA "%s"`, schema.LocalSchema)
 	if cascadeDrop {
 		query = fmt.Sprintf("%s CASCADE", query)
 	}
@@ -326,7 +326,7 @@ func importSchemaEnums(ctx context.Context, dbConnection *sql.DB, schema model.S
 			log.Errorf("error getting enum values: %s", err)
 			return err
 		}
-		query := fmt.Sprintf("CREATE TYPE %s AS ENUM (", remoteEnum)
+		query := fmt.Sprintf(`CREATE TYPE "%s" AS ENUM (`, remoteEnum)
 		quotedEnumStrings := make([]string, 0)
 		for _, enumString := range enumStrings {
 			quotedEnumStrings = append(quotedEnumStrings, fmt.Sprintf("'%s'", enumString))
@@ -370,12 +370,13 @@ func ImportSchema(ctx context.Context, dbConnection *sql.DB, serverName string, 
 	}
 	// TODO: support LIMIT TO and EXCEPT
 	sb := new(strings.Builder)
-	sb.WriteString("IMPORT FOREIGN SCHEMA ")
+	sb.WriteString(`IMPORT FOREIGN SCHEMA "`)
 	sb.WriteString(schema.RemoteSchema)
-	sb.WriteString(" FROM SERVER ")
+	sb.WriteString(`" FROM SERVER "`)
 	sb.WriteString(serverName)
-	sb.WriteString(" INTO ")
+	sb.WriteString(`" INTO "`)
 	sb.WriteString(schema.LocalSchema)
+	sb.WriteString(`"`)
 	log.Tracef("query: %s", sb.String())
 	_, err = dbConnection.Exec(sb.String())
 	if err != nil {
@@ -387,10 +388,11 @@ func ImportSchema(ctx context.Context, dbConnection *sql.DB, serverName string, 
 		log.Debugf("applying grants to schema %s for user %s", schema.LocalSchema, user)
 		// GRANT USAGE ON SCHEMA xxxx TO yyyy
 		sb := new(strings.Builder)
-		sb.WriteString("GRANT USAGE ON SCHEMA ")
+		sb.WriteString(`GRANT USAGE ON SCHEMA "`)
 		sb.WriteString(schema.LocalSchema)
-		sb.WriteString(" TO ")
+		sb.WriteString(`" TO "`)
 		sb.WriteString(user)
+		sb.WriteString(`"`)
 		query := sb.String()
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
@@ -400,10 +402,11 @@ func ImportSchema(ctx context.Context, dbConnection *sql.DB, serverName string, 
 		}
 		// GRANT SELECT ON ALL TABLES IN SCHEMA xxxx TO yyyy
 		sb = new(strings.Builder)
-		sb.WriteString("GRANT SELECT ON ALL TABLES IN SCHEMA ")
+		sb.WriteString(`GRANT SELECT ON ALL TABLES IN SCHEMA "`)
 		sb.WriteString(schema.LocalSchema)
-		sb.WriteString(" TO ")
+		sb.WriteString(`" TO "`)
 		sb.WriteString(user)
+		sb.WriteString(`"`)
 		query = sb.String()
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)

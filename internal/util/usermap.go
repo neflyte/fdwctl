@@ -136,7 +136,7 @@ func CreateUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.User
 		secretValue = ""
 	}
 	// FIXME: There could be no password at all; check for a password before using it in the SQL statement
-	query := fmt.Sprintf("CREATE USER MAPPING FOR %s SERVER %s OPTIONS (user '%s', password '%s')", usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, secretValue)
+	query := fmt.Sprintf(`CREATE USER MAPPING FOR "%s" SERVER "%s" OPTIONS (user '%s', password '%s')`, usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, secretValue)
 	log.Tracef("query: %s", query)
 	_, err = dbConnection.Exec(query)
 	if err != nil {
@@ -153,7 +153,7 @@ func UpdateUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.User
 		return logger.ErrorfAsError(log, "server name is required")
 	}
 	optArgs := make([]string, 0)
-	query := fmt.Sprintf("ALTER USER MAPPING FOR %s SERVER %s OPTIONS (", usermap.LocalUser, usermap.ServerName)
+	query := fmt.Sprintf(`ALTER USER MAPPING FOR "%s" SERVER "%s" OPTIONS (`, usermap.LocalUser, usermap.ServerName)
 	if usermap.RemoteUser != "" {
 		optArgs = append(optArgs, fmt.Sprintf("SET user '%s'", usermap.RemoteUser))
 	}
