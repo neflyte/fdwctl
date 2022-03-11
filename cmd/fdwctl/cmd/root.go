@@ -10,8 +10,9 @@ import (
 
 var (
 	rootCmd = &cobra.Command{
-		Use:   "fdwctl",
-		Short: "A management CLI for PostgreSQL postgres_fdw Foreign Data Wrapper",
+		Use:     "fdwctl",
+		Short:   "A management CLI for PostgreSQL postgres_fdw Foreign Data Wrapper",
+		Version: AppVersion,
 	}
 	logFormat        string
 	logLevel         string

@@ -1,14 +1,14 @@
 # fdwctl Makefile
-APPVERSION=0.0.3
+APPVERSION=0.0.4
 
 .PHONY: build build-docker clean start-docker stop-docker restart-docker lint test install
 
 build: lint test
-	CGO_ENABLED=0 go build -i -pkgdir "$(shell go env GOPATH)/pkg" -installsuffix nocgo -ldflags "-s -w -X main.cmd.AppVersion=$(APPVERSION)" -o fdwctl ./cmd/fdwctl
+	CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/neflyte/fdwctl/cmd/fdwctl/cmd.AppVersion=$(APPVERSION)" -o fdwctl ./cmd/fdwctl
 	{ type -p upx >/dev/null 2>&1 && upx -q fdwctl; } || true
 
-build-docker: clean lint test
-	docker build --no-cache --build-arg "APPVERSION=$(APPVERSION)" -t "neflyte/fdwctl:$(APPVERSION)" -t "neflyte/fdwctl:latest" .
+build-docker: build
+	docker build --build-arg "APPVERSION=$(APPVERSION)" -t "neflyte/fdwctl:$(APPVERSION)" -t "neflyte/fdwctl:latest" .
 
 clean:
 	{ [ -f ./fdwctl ] && rm -f ./fdwctl; } || true
@@ -26,9 +26,10 @@ lint:
 	golangci-lint run
 
 test:
-	{ [ -r coverage/c.out ] && rm -f coverage/c.out; } || true
+	@mkdir -p coverage
+	@{ [ -r coverage/c.out ] && rm -f coverage/c.out; } || true
 	CGO_ENABLED=0 go test -covermode=count -coverprofile=coverage/c.out ./...
-	{ [ -r coverage/coverage-heatmap.html ] && rm -f coverage/coverage-heatmap.html; } || true
+	@{ [ -r coverage/coverage-heatmap.html ] && rm -f coverage/coverage-heatmap.html; } || true
 	go tool cover -html=coverage/c.out -o coverage/coverage-heatmap.html
 
 install: clean build

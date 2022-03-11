@@ -42,7 +42,7 @@ func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
 			return "", logger.ErrorfAsError(log, "error reading file %s: %s", secret.FromFile, err)
 		}
 		log.Trace("returning FromFile")
-		return fmt.Sprintf("%s", rawData), nil
+		return string(rawData), nil
 	}
 	// (4) K8s Secret
 	if secret.FromK8sSecret.Namespace != "" && secret.FromK8sSecret.SecretName != "" && secret.FromK8sSecret.SecretKey != "" {
