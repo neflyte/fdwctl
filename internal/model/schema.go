@@ -45,3 +45,12 @@ func (s Schema) String() string {
 		s.SchemaGrants,
 	)
 }
+
+type SchemaEnum struct {
+	Schema string
+	Name   string
+}
+
+func (se *SchemaEnum) String() string {
+	return fmt.Sprintf("%s.%s", se.Schema, se.Name)
+}

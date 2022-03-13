@@ -246,7 +246,7 @@ func applySchemas(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	dStateSchemas := server.Schemas
 	// Diff schemas
 	schRemove, schAdd, schModify := util.DiffSchemas(dStateSchemas, dbSchemas)
-	log.Tracef("schRemove: %v, schAdd: %v, schModify: %v", schRemove, schAdd, schModify)
+	log.Tracef("schRemove: %#v, schAdd: %#v, schModify: %#v", schRemove, schAdd, schModify)
 	// Drop schemas not in DState
 	for _, schemaToRemove := range schRemove {
 		log.Debugf("removing schema %s", schemaToRemove.LocalSchema)
