@@ -2,24 +2,26 @@
 version: "3.7"
 services:
   fdwdb:
-    image: library/postgres:9.6
+    image: postgres:10
     ports:
       - 5432:5432
     environment:
       POSTGRES_PASSWORD: passw0rd
-      POSTGRES_USER: fdw
+      POSTGRES_USER: postgres
       POSTGRES_DB: fdw
+    volumes:
+      - ./docker/postgres-fdwdb:/docker-entrypoint-initdb.d
     depends_on:
       - remotedb1
     networks:
       - fdwctl_net
   remotedb1:
-    image: library/postgres:9.6
+    image: postgres:10
     ports:
       - 15432:5432
     environment:
       POSTGRES_PASSWORD: r3m0TE!
-      POSTGRES_USER: remoteuser
+      POSTGRES_USER: postgres
       POSTGRES_DB: remotedb
     volumes:
       - ./docker/postgres-remotedb:/docker-entrypoint-initdb.d

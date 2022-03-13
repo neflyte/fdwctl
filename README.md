@@ -3,7 +3,7 @@ A PostgreSQL Foreign Data Wrapper (FDW) management CLI
 -
 
 ![Golang v1.14+](https://img.shields.io/badge/Golang-v1.14+-blue?style=for-the-badge&logo=go&color=00add8&link=https://golang.org)
-![PostgreSQL v9.6+](https://img.shields.io/badge/PostgreSQL-v9.6+-blue?style=for-the-badge&logo=postgresql&color=336791&link=https://postgresql.org)
+![PostgreSQL v10+](https://img.shields.io/badge/PostgreSQL-v10+-blue?style=for-the-badge&logo=postgresql&color=336791&link=https://postgresql.org)
 
 [Features](#features) | [Installation](#installation) | [Usage](#usage) | [Configuration](#configuration)
 

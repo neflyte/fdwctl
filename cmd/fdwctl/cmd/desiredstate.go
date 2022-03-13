@@ -63,8 +63,15 @@ func doDesiredState(cmd *cobra.Command, _ []string) error {
 	}
 	// Diff servers
 	serversInDBButNotInDState, serversInDStateButNotInDB, serversAlreadyInDB := util.DiffForeignServers(dStateServers, dbServers)
+	log.Tracef(
+		"serversInDBButNotInDState: %#v, serversInDStateButNotInDB: %#v, serversAlreadyInDB: %#v",
+		serversInDBButNotInDState,
+		serversInDStateButNotInDB,
+		serversAlreadyInDB,
+	)
 	// Remove servers in DB but not in DState
 	for _, serverNotInDState := range serversInDBButNotInDState {
+		log.Debugf("removing server %s", serverNotInDState.Name)
 		err = util.DropServer(cmd.Context(), dbConnection, serverNotInDState.Name, true)
 		if err != nil {
 			log.Errorf("error dropping server %s that is not in desired state: %s", serverNotInDState.Name, err)
@@ -74,6 +81,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) error {
 	}
 	// Create servers that are in DState but not yet in DB
 	for _, serverNotInDB := range serversInDStateButNotInDB {
+		log.Debugf("creating server %s", serverNotInDB.Name)
 		err = util.CreateServer(cmd.Context(), dbConnection, serverNotInDB)
 		if err != nil {
 			log.Errorf("error creating server: %s", err)
@@ -83,6 +91,7 @@ func doDesiredState(cmd *cobra.Command, _ []string) error {
 	}
 	// Update servers that were already in the DB
 	for _, serverAlreadyInDB := range serversAlreadyInDB {
+		log.Debugf("updating server %s", serverAlreadyInDB.Name)
 		dsServer := util.FindForeignServer(config.Instance().DesiredState.Servers, serverAlreadyInDB.Name)
 		if dsServer == nil {
 			log.Errorf("cannot find desired state server %s", serverAlreadyInDB.Name)
@@ -105,15 +114,17 @@ func doDesiredState(cmd *cobra.Command, _ []string) error {
 	serversToProcess = append(serversToProcess, serversInDStateButNotInDB...)
 	serversToProcess = append(serversToProcess, serversAlreadyInDB...)
 	// Process UserMaps and Schemas
-	for _, serverAlreadyInDB := range serversToProcess {
-		err = applyUserMaps(cmd.Context(), dbConnection, serverAlreadyInDB)
+	for _, serverToProcess := range serversToProcess {
+		log.Debugf("applying user maps to %s", serverToProcess.Name)
+		err = applyUserMaps(cmd.Context(), dbConnection, serverToProcess)
 		if err != nil {
-			log.Errorf("error applying usermaps for server %s: %s", serverAlreadyInDB.Name, err)
+			log.Errorf("error applying usermaps for server %s: %s", serverToProcess.Name, err)
 			return err
 		}
-		err = applySchemas(cmd.Context(), dbConnection, serverAlreadyInDB)
+		log.Debugf("applying schemas to %s", serverToProcess.Name)
+		err = applySchemas(cmd.Context(), dbConnection, serverToProcess)
 		if err != nil {
-			log.Errorf("error applying schemas for server %s: %s", serverAlreadyInDB.Name, err)
+			log.Errorf("error applying schemas for server %s: %s", serverToProcess.Name, err)
 			return err
 		}
 	}
@@ -143,6 +154,7 @@ func applyExtensions(ctx context.Context, dbConnection *sql.DB) error {
 	}*/
 	// Add extensions
 	for _, extToAdd := range extAdd {
+		log.Debugf("creating extension %s", extToAdd.Name)
 		err = util.CreateExtension(ctx, dbConnection, extToAdd)
 		if err != nil {
 			return logger.ErrorfAsError(log, "error creating extension: %s", err)
@@ -172,6 +184,7 @@ func applyUserMaps(ctx context.Context, dbConnection *sql.DB, server model.Forei
 	// Delete Usermaps not in DState
 	for _, usermapToRemove := range usRemove {
 		usermapToRemove.ServerName = dsServer.Name
+		log.Debugf("removing usermap for local user %s", usermapToRemove.LocalUser)
 		err = util.DropUserMap(ctx, dbConnection, usermapToRemove, true)
 		if err != nil {
 			log.Errorf("error dropping user map for local user %s: %s", usermapToRemove.LocalUser, err)
@@ -182,6 +195,7 @@ func applyUserMaps(ctx context.Context, dbConnection *sql.DB, server model.Forei
 	// Add Usermaps in DState but not in DB
 	for _, usermapToAdd := range usAdd {
 		usermapToAdd.ServerName = dsServer.Name
+		log.Debugf("adding usermap for local user %s", usermapToAdd.LocalUser)
 		err = util.CreateUserMap(ctx, dbConnection, usermapToAdd)
 		if err != nil {
 			log.Errorf("error creating user map for local user %s: %s", usermapToAdd.LocalUser, err)
@@ -192,6 +206,7 @@ func applyUserMaps(ctx context.Context, dbConnection *sql.DB, server model.Forei
 	// Update usermaps that are already there
 	for _, usermapToUpdate := range usModify {
 		usermapToUpdate.ServerName = dsServer.Name
+		log.Debugf("updating usermap for local user %s", usermapToUpdate.LocalUser)
 		dbUserMap := util.FindUserMap(dbServerUsermaps, usermapToUpdate.LocalUser)
 		if dbUserMap == nil {
 			return logger.ErrorfAsError(log, "cannot find user mapping for local user %s", usermapToUpdate.LocalUser)
@@ -231,8 +246,10 @@ func applySchemas(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	dStateSchemas := server.Schemas
 	// Diff schemas
 	schRemove, schAdd, schModify := util.DiffSchemas(dStateSchemas, dbSchemas)
+	log.Tracef("schRemove: %v, schAdd: %v, schModify: %v", schRemove, schAdd, schModify)
 	// Drop schemas not in DState
 	for _, schemaToRemove := range schRemove {
+		log.Debugf("removing schema %s", schemaToRemove.LocalSchema)
 		err = util.DropSchema(ctx, dbConnection, schemaToRemove, true)
 		if err != nil {
 			log.Errorf("error dropping local schema %s: %s", schemaToRemove.LocalSchema, err)
@@ -242,6 +259,7 @@ func applySchemas(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	}
 	// Import schemas in DState but not imported
 	for _, schemaToAdd := range schAdd {
+		log.Debugf("adding schema %s", schemaToAdd.LocalSchema)
 		err = util.ImportSchema(ctx, dbConnection, server.Name, schemaToAdd)
 		if err != nil {
 			log.Errorf("error importing into local schema %s: %s", schemaToAdd.LocalSchema, err)
@@ -251,14 +269,17 @@ func applySchemas(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	}
 	// Drop + Re-Import all other schemas
 	for _, schemaToModify := range schModify {
+		log.Debugf("modifying schema %s", schemaToModify.LocalSchema)
 		if desiredStateRecreateSchemas {
 			// Drop
+			log.Debugf("recreating schema %s (drop)", schemaToModify.LocalSchema)
 			err = util.DropSchema(ctx, dbConnection, schemaToModify, true)
 			if err != nil {
 				log.Errorf("error dropping local schema %s: %s", schemaToModify.LocalSchema, err)
 				return err
 			}
 			// Import
+			log.Debugf("recreating schema %s (import)", schemaToModify.LocalSchema)
 			err = util.ImportSchema(ctx, dbConnection, server.Name, schemaToModify)
 			if err != nil {
 				log.Errorf("error importing into local schema %s: %s", schemaToModify.LocalSchema, err)

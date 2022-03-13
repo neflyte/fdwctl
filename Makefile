@@ -1,11 +1,11 @@
 # fdwctl Makefile
 APPVERSION=0.0.4
 
-.PHONY: build build-docker clean start-docker stop-docker restart-docker lint test install
+.PHONY: build build-docker clean start-docker stop-docker restart-docker lint test install test-dstate-yaml
 
-build: lint test
+build:
 	CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/neflyte/fdwctl/cmd/fdwctl/cmd.AppVersion=$(APPVERSION)" -o fdwctl ./cmd/fdwctl
-	{ type -p upx >/dev/null 2>&1 && upx -q fdwctl; } || true
+	@hash upx 2>/dev/null && { upx -q fdwctl || true; }
 
 build-docker: build
 	docker build --build-arg "APPVERSION=$(APPVERSION)" -t "neflyte/fdwctl:$(APPVERSION)" -t "neflyte/fdwctl:latest" .
@@ -34,3 +34,6 @@ test:
 
 install: clean build
 	cp ./fdwctl "$(shell go env GOPATH)/bin"
+
+test-dstate-yaml:
+	./fdwctl --config testdata/dstate.yaml apply

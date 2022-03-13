@@ -5,11 +5,15 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/elgris/sqrl"
-
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
+)
+
+const (
+	sqlGetExtensions   = `SELECT extname, extversion FROM pg_extension`
+	sqlCreateExtension = `CREATE EXTENSION IF NOT EXISTS "%s"`
+	sqlDropExtension   = `DROP EXTENSION IF EXISTS "%s"`
 )
 
 // GetExtensions returns a list of installed extensions
@@ -17,31 +21,20 @@ func GetExtensions(ctx context.Context, dbConnection *sql.DB) ([]model.Extension
 	log := logger.Log(ctx).
 		WithField("function", "GetExtensions")
 	exts := make([]model.Extension, 0)
-	query, _, err := sqrl.
-		Select("extname", "extversion").
-		From("pg_extension").
-		ToSql()
-	if err != nil {
-		log.Errorf("error creating query: %s", err)
-		return nil, err
-	}
-	rows, err := dbConnection.Query(query)
+	rows, err := dbConnection.Query(sqlGetExtensions)
 	if err != nil {
 		log.Errorf("error querying for extensions: %s", err)
 		return nil, err
 	}
 	defer database.CloseRows(ctx, rows)
-	var extname, extversion string
 	for rows.Next() {
-		err = rows.Scan(&extname, &extversion)
+		extension := new(model.Extension)
+		err = rows.Scan(&extension.Name, &extension.Version)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			return nil, err
 		}
-		exts = append(exts, model.Extension{
-			Name:    extname,
-			Version: extversion,
-		})
+		exts = append(exts, *extension)
 	}
 	if rows.Err() != nil {
 		log.Errorf("error iterating result rows: %s", rows.Err())
@@ -89,7 +82,7 @@ func DiffExtensions(dStateExts []model.Extension, dbExts []model.Extension) (ext
 func CreateExtension(ctx context.Context, dbConnection *sql.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "CreateExtension")
-	_, err := dbConnection.Exec(fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS "%s"`, ext.Name))
+	_, err := dbConnection.Exec(fmt.Sprintf(sqlCreateExtension, ext.Name))
 	if err != nil {
 		return logger.ErrorfAsError(log, "error creating extension %s: %s", ext.Name, err)
 	}
@@ -100,7 +93,7 @@ func CreateExtension(ctx context.Context, dbConnection *sql.DB, ext model.Extens
 func DropExtension(ctx context.Context, dbConnection *sql.DB, ext model.Extension) error {
 	log := logger.Log(ctx).
 		WithField("function", "DropExtension")
-	_, err := dbConnection.Exec(fmt.Sprintf(`DROP EXTENSION IF EXISTS "%s"`, ext.Name))
+	_, err := dbConnection.Exec(fmt.Sprintf(sqlDropExtension, ext.Name))
 	if err != nil {
 		return logger.ErrorfAsError(log, "error dropping extension %s: %s", ext.Name, err)
 	}
