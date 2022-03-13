@@ -2,11 +2,12 @@ package util
 
 import (
 	"database/sql"
+	"os"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
 )
 
 func TestMain(m *testing.M) {

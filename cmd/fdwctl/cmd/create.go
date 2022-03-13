@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/neflyte/fdwctl/internal/config"
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
 	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/cobra"
-	"strconv"
-	"strings"
 )
 
 var (

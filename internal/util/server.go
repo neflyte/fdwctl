@@ -13,6 +13,13 @@ import (
 	"github.com/neflyte/fdwctl/internal/model"
 )
 
+const (
+	sqlCreateServer = `CREATE SERVER "%s" FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s')`
+	sqlDropServer   = `DROP SERVER "%s"`
+	sqlUpdateServer = `ALTER SERVER "%s" OPTIONS (%s)`
+	sqlRenameServer = `ALTER SERVER "%s" RENAME TO "%s"`
+)
+
 func GetServers(ctx context.Context, dbConnection *sql.DB) ([]model.ForeignServer, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetServers")
@@ -72,7 +79,7 @@ func DropServer(ctx context.Context, dbConnection *sql.DB, servername string, ca
 	if servername == "" {
 		return logger.ErrorfAsError(log, "server name is required")
 	}
-	query := fmt.Sprintf("DROP SERVER %s", servername)
+	query := fmt.Sprintf(sqlDropServer, servername)
 	if cascade {
 		query = fmt.Sprintf("%s CASCADE", query)
 	}
@@ -88,13 +95,7 @@ func DropServer(ctx context.Context, dbConnection *sql.DB, servername string, ca
 func CreateServer(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer) error {
 	log := logger.Log(ctx).
 		WithField("function", "CreateServer")
-	query := fmt.Sprintf(
-		`CREATE SERVER "%s" FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s')`,
-		server.Name,
-		server.Host,
-		server.Port,
-		server.DB,
-	)
+	query := fmt.Sprintf(sqlCreateServer, server.Name, server.Host, server.Port, server.DB)
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {
@@ -108,7 +109,8 @@ func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	log := logger.Log(ctx).
 		WithField("function", "UpdateServer")
 	// Edit server hostname, port, and dbname
-	query := fmt.Sprintf(`ALTER SERVER "%s" OPTIONS (`, server.Name)
+	// ALTER SERVER "%s" OPTIONS (%s)
+	// query := fmt.Sprintf(`ALTER SERVER "%s" OPTIONS (`, server.Name)
 	opts := make([]string, 0)
 	if server.Host != "" {
 		opts = append(opts, fmt.Sprintf("SET host '%s'", server.Host))
@@ -119,7 +121,8 @@ func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	if server.DB != "" {
 		opts = append(opts, fmt.Sprintf("SET dbname '%s'", server.DB))
 	}
-	query = fmt.Sprintf("%s %s )", query, strings.Join(opts, ","))
+	// query = fmt.Sprintf("%s %s )", query, strings.Join(opts, ","))
+	query := fmt.Sprintf(sqlUpdateServer, server.Name, strings.Join(opts, ","))
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {
@@ -133,7 +136,7 @@ func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 func UpdateServerName(ctx context.Context, dbConnection *sql.DB, server model.ForeignServer, newServerName string) error {
 	log := logger.Log(ctx).
 		WithField("function", "UpdateServerName")
-	query := fmt.Sprintf(`ALTER SERVER "%s" RENAME TO "%s"`, server.Name, newServerName)
+	query := fmt.Sprintf(sqlRenameServer, server.Name, newServerName)
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {

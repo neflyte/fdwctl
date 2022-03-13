@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/neflyte/fdwctl/internal/model"
-	"github.com/stretchr/testify/require"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_ensureSchema_SchemaExists(t *testing.T) {

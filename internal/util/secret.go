@@ -6,17 +6,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
 	"io/ioutil"
 	"os"
 	"os/exec"
-)
 
-func SecretIsDefined(secret model.Secret) bool {
-	return secret.Value != "" || secret.FromEnv != "" || secret.FromFile != "" ||
-		(secret.FromK8sSecret.Namespace != "" && secret.FromK8sSecret.SecretName != "" && secret.FromK8sSecret.SecretKey != "")
-}
+	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/internal/model"
+)
 
 func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
 	log := logger.Log(ctx).

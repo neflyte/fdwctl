@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/neflyte/fdwctl/internal/model"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 func TestUnit_GetExtensions_Nominal(t *testing.T) {

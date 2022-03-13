@@ -5,14 +5,15 @@ package config
 
 import (
 	"encoding/json"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
 	"github.com/neflyte/fdwctl/internal/util"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
-	"os"
-	"path"
-	"strings"
 )
 
 // appConfig is the application configuration structure. Configuration files are unmarshaled into it directly.

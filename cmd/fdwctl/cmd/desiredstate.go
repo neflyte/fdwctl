@@ -211,7 +211,8 @@ func applyUserMaps(ctx context.Context, dbConnection *sql.DB, server model.Forei
 		if dbUserMap == nil {
 			return logger.ErrorfAsError(log, "cannot find user mapping for local user %s", usermapToUpdate.LocalUser)
 		}
-		if util.SecretIsDefined(usermapToUpdate.RemoteSecret) {
+		// if util.SecretIsDefined(usermapToUpdate.RemoteSecret) {
+		if usermapToUpdate.RemoteSecret.IsDefined() {
 			remoteSecret := ""
 			remoteSecret, err = util.GetSecret(ctx, usermapToUpdate.RemoteSecret)
 			if err != nil {

@@ -7,10 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (

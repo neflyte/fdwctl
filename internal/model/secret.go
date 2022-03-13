@@ -51,3 +51,8 @@ func (s *Secret) String() string {
 		s.FromK8sSecret,
 	)
 }
+
+func (s *Secret) IsDefined() bool {
+	return s.Value != "" || s.FromEnv != "" || s.FromFile != "" ||
+		(s.FromK8sSecret.Namespace != "" && s.FromK8sSecret.SecretName != "" && s.FromK8sSecret.SecretKey != "")
+}
