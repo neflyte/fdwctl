@@ -1,7 +1,7 @@
 # fdwctl Makefile
 APPVERSION=0.0.4
 
-.PHONY: build build-docker clean start-docker stop-docker restart-docker lint test install test-dstate-yaml
+.PHONY: build build-docker clean start-docker stop-docker restart-docker lint test install test-dstate-yaml reformat reformat-gofmt reformat-goimports
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/neflyte/fdwctl/cmd/fdwctl/cmd.AppVersion=$(APPVERSION)" -o fdwctl ./cmd/fdwctl
@@ -37,3 +37,13 @@ install: clean build
 
 test-dstate-yaml:
 	./fdwctl --config testdata/dstate.yaml apply
+
+reformat: reformat-gofmt reformat-goimports
+	@echo "reformatted source files."
+
+reformat-gofmt:
+	go fmt ./...
+
+reformat-goimports:
+	@hash goimports 2>/dev/null || { cd && go install golang.org/x/tools/cmd/goimports@latest; cd -; }
+	find . -type f -name "*.go" | xargs goimports -w
