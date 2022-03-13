@@ -1,7 +1,7 @@
 # fdwctl Makefile
 APPVERSION=0.0.4
 
-.PHONY: build build-docker clean start-docker stop-docker restart-docker lint test install test-dstate-yaml reformat reformat-gofmt reformat-goimports
+.PHONY: build build-docker clean start-docker stop-docker restart-docker lint test install test-dstate-yaml test-dstate-json reformat reformat-gofmt reformat-goimports
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/neflyte/fdwctl/cmd/fdwctl/cmd.AppVersion=$(APPVERSION)" -o fdwctl ./cmd/fdwctl
@@ -37,6 +37,15 @@ install: clean build
 
 test-dstate-yaml:
 	./fdwctl --config testdata/dstate.yaml apply
+	hash psql 2>/dev/null && { \
+  		PGPASSWORD='passw0rd' psql -h localhost -p 5432 -U fdw -d fdw -c 'SELECT * FROM remotedb.foo;'; \
+	}
+
+test-dstate-json:
+	./fdwctl --config testdata/dstate.json apply
+	hash psql 2>/dev/null && { \
+  		PGPASSWORD='passw0rd' psql -h localhost -p 5432 -U fdw -d fdw -c 'SELECT * FROM remotedb.foo;'; \
+	}
 
 reformat: reformat-gofmt reformat-goimports
 	@echo "reformatted source files."

@@ -18,6 +18,6 @@ type -p psql &>/dev/null && {
   PGPASSWORD='passw0rd' psql -h localhost -p 5432 -U postgres -d fdw -c 'GRANT USAGE ON SCHEMA remotedb1 TO fdw;'
   PGPASSWORD='passw0rd' psql -h localhost -p 5432 -U postgres -d fdw -c 'GRANT SELECT ON ALL TABLES IN SCHEMA remotedb1 TO postgres;'
   PGPASSWORD='passw0rd' psql -h localhost -p 5432 -U postgres -d fdw -c 'GRANT SELECT ON ALL TABLES IN SCHEMA remotedb1 TO fdw;'
-  PGPASSWORD='fDw!u5eR' psql -h localhost -p 5432 -U fdw -d fdw -c 'SELECT * FROM remotedb1.foo;'
+  PGPASSWORD='passw0rd' psql -h localhost -p 5432 -U fdw -d fdw -c 'SELECT * FROM remotedb1.foo;'
 }
 echo "done."

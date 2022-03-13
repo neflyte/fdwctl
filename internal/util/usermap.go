@@ -127,7 +127,7 @@ func CreateUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.User
 		return logger.ErrorfAsError(log, "server name is required")
 	}
 	// Check if the secret is defined before resolving it
-	if SecretIsDefined(usermap.RemoteSecret) {
+	if usermap.RemoteSecret.IsDefined() {
 		secretValue, err = GetSecret(ctx, usermap.RemoteSecret)
 		if err != nil {
 			return logger.ErrorfAsError(log, "error getting secret value: %s", err)
@@ -157,7 +157,7 @@ func UpdateUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.User
 	if usermap.RemoteUser != "" {
 		optArgs = append(optArgs, fmt.Sprintf("SET user '%s'", usermap.RemoteUser))
 	}
-	if SecretIsDefined(usermap.RemoteSecret) {
+	if usermap.RemoteSecret.IsDefined() {
 		secretValue, err := GetSecret(ctx, usermap.RemoteSecret)
 		if err != nil {
 			return logger.ErrorfAsError(log, "error getting secret value: %s", err)

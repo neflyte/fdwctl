@@ -35,7 +35,7 @@
             }
           },
           {
-            "localschema": "remotedb",
+            "localschema": "miXEDcaSEscHEMa",
             "remoteschema": "miXEDcaSEscHEMa",
             "importenums": true,
             "enumconnection": "postgres://remoteuser@localhost:15432/remotedb?sslmode=disable",

@@ -135,7 +135,7 @@ func ResolveConnectionString(connStr string, secret *model.Secret) string {
 		}
 	}
 	// Handle secret
-	if SecretIsDefined(*secret) {
+	if secret.IsDefined() {
 		return connectionStringWithSecret(connURL, *secret)
 	}
 	return connURL.String()
