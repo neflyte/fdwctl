@@ -6,42 +6,28 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elgris/sqrl"
-
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
 )
 
 const (
-	sqlCreateServer = `CREATE SERVER "%s" FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s')`
-	sqlDropServer   = `DROP SERVER "%s"`
-	sqlUpdateServer = `ALTER SERVER "%s" OPTIONS (%s)`
-	sqlRenameServer = `ALTER SERVER "%s" RENAME TO "%s"`
+	sqlCreateServer      = `CREATE SERVER "%s" FOREIGN DATA WRAPPER postgres_fdw OPTIONS (host '%s', port '%d', dbname '%s')`
+	sqlDropServer        = `DROP SERVER "%s"`
+	sqlUpdateServer      = `ALTER SERVER "%s" OPTIONS (%s)`
+	sqlRenameServer      = `ALTER SERVER "%s" RENAME TO "%s"`
+	sqlForeignServerInfo = `SELECT fs.foreign_server_name, fs.foreign_data_wrapper_name, fs.authorization_identifier, fsoh.option_value AS hostname, fsop.option_value::int AS port, fsod.option_value AS dbname
+	FROM information_schema.foreign_servers fs
+	JOIN information_schema.foreign_server_options fsoh ON fsoh.foreign_server_name = fs.foreign_server_name AND fsoh.option_name = 'host'
+	JOIN information_schema.foreign_server_options fsop ON fsop.foreign_server_name = fs.foreign_server_name AND fsop.option_name = 'port'
+	JOIN information_schema.foreign_server_options fsod ON fsod.foreign_server_name = fs.foreign_server_name AND fsod.option_name = 'dbname'`
 )
 
 func GetServers(ctx context.Context, dbConnection *sql.DB) ([]model.ForeignServer, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetServers")
-	query, _, err := sqrl.
-		Select(
-			"fs.foreign_server_name",
-			"fs.foreign_data_wrapper_name",
-			"fs.authorization_identifier",
-			"fsoh.option_value AS hostname",
-			"fsop.option_value::int AS port",
-			"fsod.option_value AS dbname",
-		).From("information_schema.foreign_servers fs").
-		Join("information_schema.foreign_server_options fsoh ON fsoh.foreign_server_name = fs.foreign_server_name AND fsoh.option_name = 'host'").
-		Join("information_schema.foreign_server_options fsop ON fsop.foreign_server_name = fs.foreign_server_name AND fsop.option_name = 'port'").
-		Join("information_schema.foreign_server_options fsod ON fsod.foreign_server_name = fs.foreign_server_name AND fsod.option_name = 'dbname'").
-		ToSql()
-	if err != nil {
-		log.Errorf("error creating query: %s", err)
-		return nil, err
-	}
-	log.Tracef("query: %s", query)
-	rows, err := dbConnection.Query(query)
+	log.Tracef("query: %s", sqlForeignServerInfo)
+	rows, err := dbConnection.Query(sqlForeignServerInfo)
 	if err != nil {
 		log.Errorf("error querying for servers: %s", err)
 		return nil, err
@@ -109,8 +95,6 @@ func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	log := logger.Log(ctx).
 		WithField("function", "UpdateServer")
 	// Edit server hostname, port, and dbname
-	// ALTER SERVER "%s" OPTIONS (%s)
-	// query := fmt.Sprintf(`ALTER SERVER "%s" OPTIONS (`, server.Name)
 	opts := make([]string, 0)
 	if server.Host != "" {
 		opts = append(opts, fmt.Sprintf("SET host '%s'", server.Host))
@@ -121,7 +105,6 @@ func UpdateServer(ctx context.Context, dbConnection *sql.DB, server model.Foreig
 	if server.DB != "" {
 		opts = append(opts, fmt.Sprintf("SET dbname '%s'", server.DB))
 	}
-	// query = fmt.Sprintf("%s %s )", query, strings.Join(opts, ","))
 	query := fmt.Sprintf(sqlUpdateServer, server.Name, strings.Join(opts, ","))
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)

@@ -6,17 +6,24 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/elgris/sqrl"
-
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
 	"github.com/neflyte/fdwctl/internal/model"
 )
 
 const (
-	// usermapSQLPrefix is the WITH clause used as a prefix on the SQL statement to retrieve usermaps from the DB
-	usermapSQLPrefix = `WITH remoteuser AS (SELECT authorization_identifier, foreign_server_name, option_value AS remoteuser FROM information_schema.user_mapping_options WHERE option_name = 'user'),
-remotepassword AS (SELECT authorization_identifier, foreign_server_name, option_value AS remotepassword FROM information_schema.user_mapping_options WHERE option_name = 'password')`
+	sqlGetUsermaps = `WITH remoteuser AS (
+	SELECT authorization_identifier, foreign_server_name, option_value AS remoteuser FROM information_schema.user_mapping_options WHERE option_name = 'user'
+), remotepassword AS (
+	SELECT authorization_identifier, foreign_server_name, option_value AS remotepassword FROM information_schema.user_mapping_options WHERE option_name = 'password'
+)
+SELECT ru.authorization_identifier, ru.remoteuser, rp.remotepassword, ru.foreign_server_name
+FROM remoteuser ru
+JOIN remotepassword rp ON ru.authorization_identifier = rp.authorization_identifier AND ru.foreign_server_name = rp.foreign_server_name`
+
+	sqlDropUsermap   = `DROP USER MAPPING IF EXISTS FOR "%s" SERVER "%s"`
+	sqlCreateUsermap = `CREATE USER MAPPING FOR "%s" SERVER "%s" OPTIONS (user '%s', password '%s')`
+	sqlUpdateUsermap = `ALTER USER MAPPING FOR "%s" SERVER "%s" OPTIONS (%s)`
 )
 
 func FindUserMap(usermaps []model.UserMap, localuser string) *model.UserMap {
@@ -31,20 +38,11 @@ func FindUserMap(usermaps []model.UserMap, localuser string) *model.UserMap {
 func GetUserMapsForServer(ctx context.Context, dbConnection *sql.DB, foreignServer string) ([]model.UserMap, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetUserMapsForServer")
-	qbuilder := sqrl.
-		Select("ru.authorization_identifier", "ru.remoteuser", "rp.remotepassword", "ru.foreign_server_name").
-		From("remoteuser ru").
-		Join("remotepassword rp ON ru.authorization_identifier = rp.authorization_identifier AND ru.foreign_server_name = rp.foreign_server_name")
-	qbuilder.Prefix(usermapSQLPrefix)
+	query := sqlGetUsermaps
+	qArgs := make([]interface{}, 1)
 	if foreignServer != "" {
-		qbuilder = qbuilder.Where(sqrl.Eq{"ru.foreign_server_name": foreignServer})
-	}
-	query, qArgs, err := qbuilder.
-		PlaceholderFormat(sqrl.Dollar).
-		ToSql()
-	if err != nil {
-		log.Errorf("error creating query: %s", err)
-		return nil, err
+		query += " WHERE ru.foreign_server_name = $1"
+		qArgs[0] = foreignServer
 	}
 	log.Tracef("query: %s, args: %#v", query, qArgs)
 	userRows, err := dbConnection.Query(query, qArgs...)
@@ -99,7 +97,7 @@ func DropUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.UserMa
 	if usermap.ServerName == "" {
 		return logger.ErrorfAsError(log, "server name is required")
 	}
-	query := fmt.Sprintf("DROP USER MAPPING IF EXISTS FOR %s SERVER %s", usermap.LocalUser, usermap.ServerName)
+	query := fmt.Sprintf(sqlDropUsermap, usermap.LocalUser, usermap.ServerName)
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {
@@ -136,7 +134,7 @@ func CreateUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.User
 		secretValue = ""
 	}
 	// FIXME: There could be no password at all; check for a password before using it in the SQL statement
-	query := fmt.Sprintf(`CREATE USER MAPPING FOR "%s" SERVER "%s" OPTIONS (user '%s', password '%s')`, usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, secretValue)
+	query := fmt.Sprintf(sqlCreateUsermap, usermap.LocalUser, usermap.ServerName, usermap.RemoteUser, secretValue)
 	log.Tracef("query: %s", query)
 	_, err = dbConnection.Exec(query)
 	if err != nil {
@@ -153,7 +151,6 @@ func UpdateUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.User
 		return logger.ErrorfAsError(log, "server name is required")
 	}
 	optArgs := make([]string, 0)
-	query := fmt.Sprintf(`ALTER USER MAPPING FOR "%s" SERVER "%s" OPTIONS (`, usermap.LocalUser, usermap.ServerName)
 	if usermap.RemoteUser != "" {
 		optArgs = append(optArgs, fmt.Sprintf("SET user '%s'", usermap.RemoteUser))
 	}
@@ -164,7 +161,7 @@ func UpdateUserMap(ctx context.Context, dbConnection *sql.DB, usermap model.User
 		}
 		optArgs = append(optArgs, fmt.Sprintf("SET password '%s'", secretValue))
 	}
-	query = fmt.Sprintf("%s %s )", query, strings.Join(optArgs, ", "))
+	query := fmt.Sprintf(sqlUpdateUsermap, usermap.LocalUser, usermap.ServerName, strings.Join(optArgs, ", "))
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {

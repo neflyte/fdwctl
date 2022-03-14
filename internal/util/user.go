@@ -5,25 +5,21 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/elgris/sqrl"
-
 	"github.com/neflyte/fdwctl/internal/database"
 	"github.com/neflyte/fdwctl/internal/logger"
+)
+
+const (
+	sqlUserExists = `SELECT 1 FROM pg_user WHERE usename = $1`
+	sqlCreateUser = `CREATE USER "%s" WITH PASSWORD '%s'`
+	sqlDropUser   = `DROP USER IF EXISTS "%s"`
 )
 
 func EnsureUser(ctx context.Context, dbConnection *sql.DB, userName string, userPassword string) error {
 	log := logger.Log(ctx).
 		WithField("function", "EnsureUser")
-	query, args, err := sqrl.Select("1").
-		From("pg_user").
-		Where(sqrl.Eq{"usename": userName}).
-		PlaceholderFormat(sqrl.Dollar).
-		ToSql()
-	if err != nil {
-		return fmt.Errorf("error creating query: %s", err)
-	}
-	log.Tracef("query: %s, args: %#v", query, args)
-	rows, err := dbConnection.Query(query, args...)
+	log.Tracef("query: %s, args: %#v", sqlUserExists, userName)
+	rows, err := dbConnection.Query(sqlUserExists, userName)
 	if err != nil {
 		return fmt.Errorf("error verifying user: %s", err)
 	}
@@ -45,7 +41,7 @@ func EnsureUser(ctx context.Context, dbConnection *sql.DB, userName string, user
 	}
 	if !userExists {
 		log.Debugf("user does not exist; creating")
-		query = fmt.Sprintf(`CREATE USER "%s" WITH PASSWORD '%s'`, userName, userPassword)
+		query := fmt.Sprintf(sqlCreateUser, userName, userPassword)
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
 		if err != nil {
@@ -64,7 +60,7 @@ func DropUser(ctx context.Context, dbConnection *sql.DB, username string) error 
 	if username == "" {
 		return logger.ErrorfAsError(log, "user name is required")
 	}
-	query := fmt.Sprintf(`DROP USER IF EXISTS "%s"`, username)
+	query := fmt.Sprintf(sqlDropUser, username)
 	log.Tracef("query: %s", query)
 	_, err := dbConnection.Exec(query)
 	if err != nil {
