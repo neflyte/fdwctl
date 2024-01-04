@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/lib/logger"
 	"github.com/stretchr/testify/require"
 )
 

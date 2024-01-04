@@ -6,12 +6,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/model"
 )
 
 func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
@@ -33,7 +32,7 @@ func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
 	}
 	// (3) Flat file
 	if secret.FromFile != "" {
-		rawData, err := ioutil.ReadFile(secret.FromFile)
+		rawData, err := os.ReadFile(secret.FromFile)
 		if err != nil {
 			return "", logger.ErrorfAsError(log, "error reading file %s: %s", secret.FromFile, err)
 		}

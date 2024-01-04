@@ -12,8 +12,8 @@ import (
 
 	"github.com/neflyte/configmap"
 
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/model"
 )
 
 const (

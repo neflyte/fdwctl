@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/neflyte/fdwctl/internal/database"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/neflyte/fdwctl/lib/database"
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/model"
 )
 
 const (
@@ -178,10 +178,10 @@ func GetSchemasForServer(ctx context.Context, dbConnection *sql.DB, serverName s
 	log := logger.Log(ctx).
 		WithField("function", "GetSchemasForServer")
 	query := sqlGetForeignSchemas
-	args := make([]interface{}, 1)
+	args := make([]interface{}, 0)
 	if serverName != "" {
 		query = fmt.Sprintf("%s %s", query, sqlGetForeignSchemasConstraint)
-		args[0] = serverName
+		args = append(args, serverName)
 	}
 	log.Tracef("query: %s; args: %#v", query, args)
 	schemaRows, err := dbConnection.Query(query, args...)

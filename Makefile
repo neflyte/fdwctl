@@ -8,7 +8,7 @@ build:
 	@hash upx 2>/dev/null && { upx -q fdwctl || true; }
 
 build-docker: build
-	docker build --build-arg "APPVERSION=$(APPVERSION)" -t "neflyte/fdwctl:$(APPVERSION)" -t "neflyte/fdwctl:latest" .
+	docker buildx build --build-arg "APPVERSION=$(APPVERSION)" -t "neflyte/fdwctl:$(APPVERSION)" -t "neflyte/fdwctl:latest" .
 
 clean:
 	{ [ -f ./fdwctl ] && rm -f ./fdwctl; } || true
@@ -22,8 +22,9 @@ stop-docker:
 restart-docker: stop-docker start-docker
 	@echo "services restarted."
 
-lint:
-	golangci-lint run
+lint: check-fieldalignment
+	@golangci-lint --version
+	golangci-lint run --timeout=10m --verbose
 
 test:
 	@mkdir -p coverage
@@ -56,3 +57,16 @@ reformat-gofmt:
 reformat-goimports:
 	@hash goimports 2>/dev/null || { cd && go install golang.org/x/tools/cmd/goimports@latest; cd -; }
 	find . -type f -name "*.go" | xargs goimports -w
+
+outdated:
+	hash go-mod-outdated 2>/dev/null || { cd && go install github.com/psampaz/go-mod-outdated@v0.9.0; }
+	go list -json -u -m all | go-mod-outdated -direct -update
+
+ensure-fieldalignment:
+	hash fieldalignment 2>/dev/null || { cd && go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest; }
+
+check-fieldalignment: ensure-fieldalignment
+	fieldalignment ./...
+
+autofix-fieldalignment: ensure-fieldalignment
+	fieldalignment -fix ./...

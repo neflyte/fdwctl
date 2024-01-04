@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/jackc/pgx/v4/stdlib"
 
-	"github.com/neflyte/fdwctl/internal/logger"
+	"github.com/neflyte/fdwctl/lib/logger"
 )
 
 const (

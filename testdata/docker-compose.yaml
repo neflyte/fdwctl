@@ -2,7 +2,7 @@
 version: "3.7"
 services:
   fdwdb:
-    image: postgres:10
+    image: postgres:15
     ports:
       - 5432:5432
     environment:
@@ -16,7 +16,7 @@ services:
     networks:
       - fdwctl_net
   remotedb1:
-    image: postgres:10
+    image: postgres:15
     ports:
       - 15432:5432
     environment:

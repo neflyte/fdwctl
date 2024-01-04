@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/neflyte/fdwctl/lib/model"
 	"github.com/stretchr/testify/require"
 )
 
