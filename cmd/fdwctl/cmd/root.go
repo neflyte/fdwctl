@@ -2,16 +2,18 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/neflyte/fdwctl/internal/config"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/util"
+
+	"github.com/neflyte/fdwctl/lib/config"
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/util"
 	"github.com/spf13/cobra"
 )
 
 var (
 	rootCmd = &cobra.Command{
-		Use:   "fdwctl",
-		Short: "A management CLI for PostgreSQL postgres_fdw Foreign Data Wrapper",
+		Use:     "fdwctl",
+		Short:   "A management CLI for PostgreSQL postgres_fdw Foreign Data Wrapper",
+		Version: AppVersion,
 	}
 	logFormat        string
 	logLevel         string

@@ -1,5 +1,7 @@
 package model
 
+import "fmt"
+
 // SecretK8s represents the location of a base64-encoded credential in a Kubernetes secret
 type SecretK8s struct {
 	// Namespace is the Kubernetes namespace that contains the secret
@@ -13,6 +15,15 @@ type SecretK8s struct {
 // Equals determines if this object is equal to the supplied object
 func (sk *SecretK8s) Equals(secret SecretK8s) bool {
 	return secret.Namespace == sk.Namespace && secret.SecretName == sk.SecretName && secret.SecretKey == sk.SecretKey
+}
+
+func (sk *SecretK8s) String() string {
+	return fmt.Sprintf(
+		"namespace: %s, name: %s, key: %s",
+		sk.Namespace,
+		sk.SecretName,
+		sk.SecretKey,
+	)
 }
 
 // Secret defines where to retrieve a credential from
@@ -30,4 +41,18 @@ type Secret struct {
 // Equals determines if this object is equal to the supplied object
 func (s *Secret) Equals(secret Secret) bool {
 	return secret.Value == s.Value && secret.FromEnv == s.FromEnv && secret.FromFile == s.FromFile && secret.FromK8sSecret.Equals(s.FromK8sSecret)
+}
+
+func (s *Secret) String() string {
+	return fmt.Sprintf(
+		"value: xxxx, fromEnv: %s, fromFile: %s, fromK8sSecret: {%s}",
+		s.FromEnv,
+		s.FromFile,
+		s.FromK8sSecret,
+	)
+}
+
+func (s *Secret) IsDefined() bool {
+	return s.Value != "" || s.FromEnv != "" || s.FromFile != "" ||
+		(s.FromK8sSecret.Namespace != "" && s.FromK8sSecret.SecretName != "" && s.FromK8sSecret.SecretKey != "")
 }

@@ -24,3 +24,9 @@ DesiredState:
           enumconnection: "postgres://remoteuser@localhost:15432/remotedb?sslmode=disable"
           enumsecret:
             value: "r3m0TE!"
+        - localschema: miXEDcaSEscHEMa
+          remoteschema: miXEDcaSEscHEMa
+          importenums: true
+          enumconnection: "postgres://remoteuser@localhost:15432/remotedb?sslmode=disable"
+          enumsecret:
+            value: "r3m0TE!"

@@ -6,17 +6,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
-	"io/ioutil"
 	"os"
 	"os/exec"
-)
 
-func SecretIsDefined(secret model.Secret) bool {
-	return secret.Value != "" || secret.FromEnv != "" || secret.FromFile != "" ||
-		(secret.FromK8sSecret.Namespace != "" && secret.FromK8sSecret.SecretName != "" && secret.FromK8sSecret.SecretKey != "")
-}
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/model"
+)
 
 func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
 	log := logger.Log(ctx).
@@ -37,12 +32,12 @@ func GetSecret(ctx context.Context, secret model.Secret) (string, error) {
 	}
 	// (3) Flat file
 	if secret.FromFile != "" {
-		rawData, err := ioutil.ReadFile(secret.FromFile)
+		rawData, err := os.ReadFile(secret.FromFile)
 		if err != nil {
 			return "", logger.ErrorfAsError(log, "error reading file %s: %s", secret.FromFile, err)
 		}
 		log.Trace("returning FromFile")
-		return fmt.Sprintf("%s", rawData), nil
+		return string(rawData), nil
 	}
 	// (4) K8s Secret
 	if secret.FromK8sSecret.Namespace != "" && secret.FromK8sSecret.SecretName != "" && secret.FromK8sSecret.SecretKey != "" {

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/neflyte/fdwctl/internal/model"
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/neflyte/fdwctl/lib/model"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_GetExtensions_Nominal(t *testing.T) {
@@ -86,7 +87,7 @@ func TestUnit_CreateExtension_Nominal(t *testing.T) {
 		Version: "1.0.0",
 	}
 
-	mock.ExpectExec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension.Name)).
+	mock.ExpectExec(fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS "%s"`, extension.Name)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 
@@ -105,7 +106,7 @@ func TestUnit_CreateExtension_ExecError(t *testing.T) {
 		Version: "1.0.0",
 	}
 
-	mock.ExpectExec(fmt.Sprintf("CREATE EXTENSION IF NOT EXISTS %s", extension.Name)).
+	mock.ExpectExec(fmt.Sprintf(`CREATE EXTENSION IF NOT EXISTS "%s"`, extension.Name)).
 		WillReturnError(errors.New("QUERY ERROR"))
 	mock.ExpectClose()
 
@@ -125,7 +126,7 @@ func TestUnit_DropExtension_Nominal(t *testing.T) {
 		Version: "1.0.0",
 	}
 
-	mock.ExpectExec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension.Name)).
+	mock.ExpectExec(fmt.Sprintf(`DROP EXTENSION IF EXISTS "%s"`, extension.Name)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 
@@ -144,7 +145,7 @@ func TestUnit_DropExtension_ExecError(t *testing.T) {
 		Version: "1.0.0",
 	}
 
-	mock.ExpectExec(fmt.Sprintf("DROP EXTENSION IF EXISTS %s", extension.Name)).
+	mock.ExpectExec(fmt.Sprintf(`DROP EXTENSION IF EXISTS "%s"`, extension.Name)).
 		WillReturnError(errors.New("QUERY ERROR"))
 	mock.ExpectClose()
 

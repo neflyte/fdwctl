@@ -9,10 +9,10 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
-	"github.com/neflyte/fdwctl/internal/config"
-	"github.com/neflyte/fdwctl/internal/database"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/util"
+	"github.com/neflyte/fdwctl/lib/config"
+	"github.com/neflyte/fdwctl/lib/database"
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/util"
 )
 
 var (

@@ -1,5 +1,7 @@
 package model
 
+import "fmt"
+
 // UserMap represents a Postgres user mapping
 type UserMap struct {
 	// ServerName is the name of the foreign server
@@ -15,4 +17,14 @@ type UserMap struct {
 // Equals determines if this object is equal to the supplied object
 func (um *UserMap) Equals(umap UserMap) bool {
 	return um.LocalUser == umap.LocalUser && um.RemoteUser == umap.RemoteUser && um.RemoteSecret.Value == umap.RemoteSecret.Value
+}
+
+func (um *UserMap) String() string {
+	return fmt.Sprintf(
+		"name: %s, localuser: %s, remoteuser: %s, remotesecret: {%s}",
+		um.ServerName,
+		um.LocalUser,
+		um.RemoteUser,
+		um.RemoteSecret,
+	)
 }

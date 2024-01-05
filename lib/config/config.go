@@ -5,26 +5,23 @@ package config
 
 import (
 	"encoding/json"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
-	"github.com/neflyte/fdwctl/internal/util"
-	"github.com/spf13/afero"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/model"
+	"github.com/neflyte/fdwctl/lib/util"
+	"github.com/spf13/afero"
+	"gopkg.in/yaml.v3"
 )
 
 // appConfig is the application configuration structure. Configuration files are unmarshaled into it directly.
 type appConfig struct {
-	// FDWConnection is the Postgres database connection string for the FDW database
-	FDWConnection string `yaml:"FDWConnection" json:"FDWConnection"`
-	// FDWConnectionSecret configures how to retrieve the optional credential for the FDWConnection connection string
 	FDWConnectionSecret model.Secret `yaml:"FDWConnectionSecret,omitempty" json:"FDWConnectionSecret,omitempty"`
-	// DesiredState defines the desired state configuration of the FDW database
-	DesiredState model.DesiredState `yaml:"DesiredState,omitempty" json:"DesiredState,omitempty"`
-	// dbConnectionString is the calculated connection string for the FDW database
-	dbConnectionString string
+	FDWConnection       string       `yaml:"FDWConnection" json:"FDWConnection"`
+	dbConnectionString  string
+	DesiredState        model.DesiredState `yaml:"DesiredState,omitempty" json:"DesiredState,omitempty"`
 }
 
 const (

@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/neflyte/fdwctl/internal/model"
-	"github.com/stretchr/testify/require"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/neflyte/fdwctl/lib/model"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_ensureSchema_SchemaExists(t *testing.T) {
@@ -34,7 +36,7 @@ func TestUnit_ensureSchema_SchemaDoesNotExist(t *testing.T) {
 	defer closeSQLMock(t, db)
 
 	schemaName := "my-schema"
-	createSchemaSQL := fmt.Sprintf("CREATE SCHEMA %s", schemaName)
+	createSchemaSQL := fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)
 
 	mock.ExpectQuery("SELECT 1 FROM information_schema.schemata WHERE schema_name = \\$1").
 		WithArgs(schemaName).
@@ -118,7 +120,7 @@ func TestUnit_ensureSchema_CreateSchemaError(t *testing.T) {
 	defer closeSQLMock(t, db)
 
 	schemaName := "my-schema"
-	createSchemaSQL := fmt.Sprintf("CREATE SCHEMA %s", schemaName)
+	createSchemaSQL := fmt.Sprintf(`CREATE SCHEMA "%s"`, schemaName)
 
 	mock.ExpectQuery("SELECT 1 FROM information_schema.schemata WHERE schema_name = \\$1").
 		WithArgs(schemaName).
@@ -139,16 +141,20 @@ func TestUnit_getEnums_Nominal(t *testing.T) {
 	db, mock := newSQLMock(t)
 	defer closeSQLMock(t, db)
 
-	mock.ExpectQuery("SELECT typname FROM pg_type WHERE typtype = \\$1").
-		WithArgs("e").
+	mock.ExpectQuery(regexp.QuoteMeta(sqlGetSchemaEnums)).
 		WillReturnRows(
-			sqlmock.NewRows([]string{"typname"}).
-				AddRow("my-enum"),
+			sqlmock.NewRows([]string{"schema", "name"}).
+				AddRow("my-schema", "my-enum"),
 		).
 		RowsWillBeClosed()
 	mock.ExpectClose()
 
-	expected := []string{"my-enum"}
+	expected := []*model.SchemaEnum{
+		&model.SchemaEnum{
+			Name:   "my-enum",
+			Schema: "my-schema",
+		},
+	}
 	actual, err := getEnums(context.Background(), db)
 
 	require.Nil(t, err)
@@ -164,19 +170,21 @@ func TestUnit_getSchemaEnumsUsedInTables_Nominal(t *testing.T) {
 
 	schemaName := "my-schema"
 
-	mock.ExpectQuery(
-		"SELECT DISTINCT cuu.udt_name FROM information_schema.column_udt_usage cuu "+
-			"JOIN pg_type t ON t.typname = cuu.udt_name WHERE \\(t.typtype = \\$1 AND cuu.table_schema = \\$2\\)",
-	).
-		WithArgs("e", schemaName).
+	mock.ExpectQuery(regexp.QuoteMeta(sqlSchemaEnumsInTables)).
+		WithArgs(schemaName).
 		WillReturnRows(
-			sqlmock.NewRows([]string{"cuu.udt_name"}).
-				AddRow("my-enum"),
+			sqlmock.NewRows([]string{"cuu.udt_name", "cuu.udt_schema"}).
+				AddRow("my-enum", schemaName),
 		).
 		RowsWillBeClosed()
 	mock.ExpectClose()
 
-	expected := []string{"my-enum"}
+	expected := []*model.SchemaEnum{
+		&model.SchemaEnum{
+			Name:   "my-enum",
+			Schema: schemaName,
+		},
+	}
 	actual, err := getSchemaEnumsUsedInTables(context.Background(), db, schemaName)
 	require.Nil(t, err)
 	require.NotNil(t, actual)
@@ -191,10 +199,7 @@ func TestUnit_getEnumStrings_Nominal(t *testing.T) {
 
 	enumType := "e"
 
-	mock.ExpectQuery(
-		"SELECT e.enumlabel FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid " +
-			"WHERE t.typname = \\$1 ORDER BY e.enumsortorder ASC",
-	).
+	mock.ExpectQuery(regexp.QuoteMeta(sqlEnumStrings)).
 		WithArgs(enumType).
 		WillReturnRows(
 			sqlmock.NewRows([]string{"e.enumlabel"}).
@@ -288,7 +293,7 @@ func TestUnit_DropSchema_NoCascade(t *testing.T) {
 		RemoteSchema: "remote-schema",
 	}
 
-	expectedSQL := fmt.Sprintf("DROP SCHEMA %s", schema.LocalSchema)
+	expectedSQL := fmt.Sprintf(`DROP SCHEMA "%s"`, schema.LocalSchema)
 	mock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 
@@ -308,7 +313,7 @@ func TestUnit_DropSchema_WithCascade(t *testing.T) {
 		RemoteSchema: "remote-schema",
 	}
 
-	expectedSQL := fmt.Sprintf("DROP SCHEMA %s CASCADE", schema.LocalSchema)
+	expectedSQL := fmt.Sprintf(`DROP SCHEMA "%s" CASCADE`, schema.LocalSchema)
 	mock.ExpectExec(expectedSQL).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 

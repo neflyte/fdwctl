@@ -12,8 +12,8 @@ import (
 
 	"github.com/neflyte/configmap"
 
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/model"
 )
 
 const (
@@ -135,7 +135,7 @@ func ResolveConnectionString(connStr string, secret *model.Secret) string {
 		}
 	}
 	// Handle secret
-	if SecretIsDefined(*secret) {
+	if secret.IsDefined() {
 		return connectionStringWithSecret(connURL, *secret)
 	}
 	return connURL.String()

@@ -7,29 +7,52 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/elgris/sqrl"
+	"github.com/neflyte/fdwctl/lib/database"
+	"github.com/neflyte/fdwctl/lib/logger"
+	"github.com/neflyte/fdwctl/lib/model"
+)
 
-	"github.com/neflyte/fdwctl/internal/database"
-	"github.com/neflyte/fdwctl/internal/logger"
-	"github.com/neflyte/fdwctl/internal/model"
+const (
+	sqlSchemaExists   = `SELECT 1 FROM information_schema.schemata WHERE schema_name = $1`
+	sqlCreateSchema   = `CREATE SCHEMA "%s"`
+	sqlGetSchemaEnums = `SELECT n.nspname as schema, t.typname as type
+	FROM pg_type t
+	LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+	WHERE (t.typrelid = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))
+	AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_type el WHERE el.oid = t.typelem AND el.typarray = t.oid)
+	AND n.nspname NOT IN ('pg_catalog', 'information_schema')`
+
+	sqlSchemaEnumsInTables = `SELECT DISTINCT cuu.udt_name, cuu.udt_schema
+	FROM information_schema.column_udt_usage cuu
+	JOIN pg_type t ON t.typname = cuu.udt_name
+	WHERE t.typtype = 'e' AND cuu.table_schema = $1`
+
+	sqlEnumStrings = `SELECT e.enumlabel FROM pg_type t
+	JOIN pg_enum e ON e.enumtypid = t.oid
+	WHERE t.typname = $1
+	ORDER BY e.enumsortorder`
+
+	sqlGetForeignSchemas = `SELECT DISTINCT ft.foreign_table_schema, ft.foreign_server_name, ftos.option_value AS remote_schema
+	FROM information_schema.foreign_tables ft
+	JOIN information_schema.foreign_table_options ftos ON ftos.foreign_table_schema = ft.foreign_table_schema
+	AND ftos.foreign_table_catalog = ft.foreign_table_catalog
+	AND ftos.foreign_table_name = ft.foreign_table_name
+	AND ftos.option_name = 'schema_name'`
+
+	sqlGetForeignSchemasConstraint = `WHERE ft.foreign_server_name = $1`
+	sqlDropSchema                  = `DROP SCHEMA "%s"`
+	sqlCreateEnum                  = `CREATE TYPE "%s"."%s" AS ENUM(%s)`
+	sqlImportForeignSchema         = `IMPORT FOREIGN SCHEMA "%s" FROM SERVER "%s" INTO "%s"`
+	sqlGrantSchemaUsage            = `GRANT USAGE ON SCHEMA "%s" TO "%s"`
+	sqlGrantTableSelect            = `GRANT SELECT ON ALL TABLES IN SCHEMA "%s" TO "%s"`
 )
 
 // ensureSchema verifies that a schema with the supplied name exists and if it does not then it will be created
 func ensureSchema(ctx context.Context, dbConnection *sql.DB, schemaName string) error {
 	log := logger.Log(ctx).
 		WithField("function", "ensureSchema")
-	query, args, err := sqrl.
-		Select("1").
-		From("information_schema.schemata").
-		Where(sqrl.Eq{"schema_name": schemaName}).
-		PlaceholderFormat(sqrl.Dollar).
-		ToSql()
-	if err != nil {
-		log.Errorf("error creating query: %s", err)
-		return err
-	}
-	log.Tracef("query: %s, args: %#v", query, args)
-	schemaRows, err := dbConnection.Query(query, args...)
+	log.Tracef("query: %s, args: %#v", sqlSchemaExists, schemaName)
+	schemaRows, err := dbConnection.Query(sqlSchemaExists, schemaName)
 	if err != nil {
 		log.Errorf("error checking for schema: %s", err)
 		return err
@@ -53,7 +76,7 @@ func ensureSchema(ctx context.Context, dbConnection *sql.DB, schemaName string) 
 	}
 	if !localSchemaExists {
 		log.Debug("schema does not exist; creating")
-		query = fmt.Sprintf("CREATE SCHEMA %s", schemaName)
+		query := fmt.Sprintf(sqlCreateSchema, schemaName)
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
 		if err != nil {
@@ -67,36 +90,25 @@ func ensureSchema(ctx context.Context, dbConnection *sql.DB, schemaName string) 
 	return nil
 }
 
-// getEnums returns a list of ENUM types
-func getEnums(ctx context.Context, dbConnection *sql.DB) ([]string, error) {
+// getEnums returns a list of ENUM types and what schema they're located in
+func getEnums(ctx context.Context, dbConnection *sql.DB) ([]*model.SchemaEnum, error) {
 	log := logger.Log(ctx).
 		WithField("function", "getEnums")
-	query, args, err := sqrl.
-		Select("typname").
-		From("pg_type").
-		Where(sqrl.Eq{"typtype": "e"}).
-		PlaceholderFormat(sqrl.Dollar).
-		ToSql()
-	if err != nil {
-		log.Errorf("error creating query: %s", err)
-		return nil, err
-	}
-	log.Tracef("query: %s, args: %#v", query, args)
-	enumRows, err := dbConnection.Query(query, args...)
+	enumRows, err := dbConnection.Query(sqlGetSchemaEnums)
 	if err != nil {
 		log.Errorf("error querying enums: %s", err)
 		return nil, err
 	}
 	defer database.CloseRows(ctx, enumRows)
-	enums := make([]string, 0)
-	var enumName string
+	enums := make([]*model.SchemaEnum, 0)
 	for enumRows.Next() {
-		err = enumRows.Scan(&enumName)
+		schemaEnum := new(model.SchemaEnum)
+		err = enumRows.Scan(&schemaEnum.Schema, &schemaEnum.Name)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
-		enums = append(enums, enumName)
+		enums = append(enums, schemaEnum)
 	}
 	if enumRows.Err() != nil {
 		log.Errorf("error iterating result rows: %s", enumRows.Err())
@@ -106,39 +118,25 @@ func getEnums(ctx context.Context, dbConnection *sql.DB) ([]string, error) {
 }
 
 // getSchemaEnumsUsedInTables returns a list of ENUM types that are used in tables of the specified schema
-func getSchemaEnumsUsedInTables(ctx context.Context, dbConnection *sql.DB, schemaName string) ([]string, error) {
+func getSchemaEnumsUsedInTables(ctx context.Context, dbConnection *sql.DB, schemaName string) ([]*model.SchemaEnum, error) {
 	log := logger.Log(ctx).
 		WithField("function", "getSchemaEnumsUsedInTables")
-	query, args, err := sqrl.
-		Select("DISTINCT cuu.udt_name").
-		From("information_schema.column_udt_usage cuu").
-		Join("pg_type t ON t.typname = cuu.udt_name").
-		Where(sqrl.And{
-			sqrl.Eq{"t.typtype": "e"},
-			sqrl.Eq{"cuu.table_schema": schemaName},
-		}).
-		PlaceholderFormat(sqrl.Dollar).
-		ToSql()
-	if err != nil {
-		log.Errorf("error creating query: %s", err)
-		return nil, err
-	}
-	log.Tracef("query: %s, args: %#v", query, args)
-	enumRows, err := dbConnection.Query(query, args...)
+	log.Tracef("query: %s, args: %#v", sqlSchemaEnumsInTables, schemaName)
+	enumRows, err := dbConnection.Query(sqlSchemaEnumsInTables, schemaName)
 	if err != nil {
 		log.Errorf("error querying enums: %s", err)
 		return nil, err
 	}
 	defer database.CloseRows(ctx, enumRows)
-	enums := make([]string, 0)
-	var enumName string
+	enums := make([]*model.SchemaEnum, 0)
 	for enumRows.Next() {
-		err = enumRows.Scan(&enumName)
+		schemaEnum := new(model.SchemaEnum)
+		err = enumRows.Scan(&schemaEnum.Name, &schemaEnum.Schema)
 		if err != nil {
 			log.Errorf("error scanning result row: %s", err)
 			continue
 		}
-		enums = append(enums, enumName)
+		enums = append(enums, schemaEnum)
 	}
 	if enumRows.Err() != nil {
 		log.Errorf("error iterating result rows: %s", enumRows.Err())
@@ -151,20 +149,8 @@ func getSchemaEnumsUsedInTables(ctx context.Context, dbConnection *sql.DB, schem
 func getEnumStrings(ctx context.Context, dbConnection *sql.DB, enumType string) ([]string, error) {
 	log := logger.Log(ctx).
 		WithField("function", "getEnumStrings")
-	query, args, err := sqrl.
-		Select("e.enumlabel").
-		From("pg_type t").
-		Join("pg_enum e ON t.oid = e.enumtypid").
-		Where(sqrl.Eq{"t.typname": enumType}).
-		OrderBy("e.enumsortorder ASC").
-		PlaceholderFormat(sqrl.Dollar).
-		ToSql()
-	if err != nil {
-		log.Errorf("error creating query: %s", err)
-		return nil, err
-	}
-	log.Tracef("query: %s, args: %#v", query, args)
-	enumRows, err := dbConnection.Query(query, args...)
+	log.Tracef("query: %s, args: %#v", sqlEnumStrings, enumType)
+	enumRows, err := dbConnection.Query(sqlEnumStrings, enumType)
 	if err != nil {
 		log.Errorf("error querying enum data: %s", err)
 		return nil, err
@@ -191,18 +177,12 @@ func getEnumStrings(ctx context.Context, dbConnection *sql.DB, enumType string) 
 func GetSchemasForServer(ctx context.Context, dbConnection *sql.DB, serverName string) ([]model.Schema, error) {
 	log := logger.Log(ctx).
 		WithField("function", "GetSchemasForServer")
-	qbuilder := sqrl.
-		Select("DISTINCT ft.foreign_table_schema", "ft.foreign_server_name", "ftos.option_value AS remote_schema").
-		From("information_schema.foreign_tables ft").
-		Join("information_schema.foreign_table_options ftos ON " +
-			"ftos.foreign_table_schema = ft.foreign_table_schema " +
-			"AND ftos.foreign_table_catalog = ft.foreign_table_catalog " +
-			"AND ftos.foreign_table_name = ft.foreign_table_name " +
-			"AND ftos.option_name = 'schema_name'")
+	query := sqlGetForeignSchemas
+	args := make([]interface{}, 0)
 	if serverName != "" {
-		qbuilder = qbuilder.Where(sqrl.Eq{"ft.foreign_server_name": serverName})
+		query = fmt.Sprintf("%s %s", query, sqlGetForeignSchemasConstraint)
+		args = append(args, serverName)
 	}
-	query, args, _ := qbuilder.PlaceholderFormat(sqrl.Dollar).ToSql()
 	log.Tracef("query: %s; args: %#v", query, args)
 	schemaRows, err := dbConnection.Query(query, args...)
 	if err != nil {
@@ -277,7 +257,7 @@ func DropSchema(ctx context.Context, dbConnection *sql.DB, schema model.Schema, 
 	if schema.LocalSchema == "" {
 		return logger.ErrorfAsError(log, "local schema name is required")
 	}
-	query := fmt.Sprintf("DROP SCHEMA %s", schema.LocalSchema)
+	query := fmt.Sprintf(sqlDropSchema, schema.LocalSchema)
 	if cascadeDrop {
 		query = fmt.Sprintf("%s CASCADE", query)
 	}
@@ -306,32 +286,54 @@ func importSchemaEnums(ctx context.Context, dbConnection *sql.DB, schema model.S
 		log.Errorf("error getting remote ENUMs: %s", err)
 		return err
 	}
-	sort.Strings(remoteEnums)
+	sort.Slice(remoteEnums, func(i, j int) bool {
+		return strings.Compare(remoteEnums[i].Name, remoteEnums[j].Name) == -1
+	})
 	// Get a list of local enums, too
 	localEnums, err := getEnums(ctx, dbConnection)
 	if err != nil {
 		log.Errorf("error getting local ENUMs: %s", err)
 		return err
 	}
-	sort.Strings(localEnums)
+	sort.Slice(localEnums, func(i, j int) bool {
+		return strings.Compare(localEnums[i].Name, localEnums[j].Name) == -1
+	})
+	// sort.Strings(localEnums)
 	// Get enough data from remote database to re-create enums and then create them
 	for _, remoteEnum := range remoteEnums {
-		if sort.SearchStrings(localEnums, remoteEnum) != len(localEnums) {
-			log.Debugf("local enum %s exists", remoteEnum)
+		haveLocalEnum := false
+		for _, localEnum := range localEnums {
+			if remoteEnum.Name == localEnum.Name && remoteEnum.Schema == localEnum.Schema {
+				haveLocalEnum = true
+				break
+			}
+		}
+		if haveLocalEnum {
 			continue
 		}
+		//if sort.SearchStrings(localEnumNames, remoteEnum.Name) != len(localEnums) {
+		//	log.Debugf("local enum %s exists", remoteEnum)
+		//	continue
+		//}
 		var enumStrings []string
-		enumStrings, err = getEnumStrings(ctx, fdbConn, remoteEnum)
+		enumStrings, err = getEnumStrings(ctx, fdbConn, remoteEnum.Name)
 		if err != nil {
 			log.Errorf("error getting enum values: %s", err)
 			return err
 		}
-		query := fmt.Sprintf("CREATE TYPE %s AS ENUM (", remoteEnum)
-		quotedEnumStrings := make([]string, 0)
-		for _, enumString := range enumStrings {
-			quotedEnumStrings = append(quotedEnumStrings, fmt.Sprintf("'%s'", enumString))
+		quotedEnumStrings := make([]string, len(enumStrings))
+		for idx, enumString := range enumStrings {
+			quotedEnumStrings[idx] = fmt.Sprintf(`'%s'`, enumString)
 		}
-		query = fmt.Sprintf("%s %s )", query, strings.Join(quotedEnumStrings, ","))
+		// ensure enum schema exists
+		err = ensureSchema(ctx, dbConnection, remoteEnum.Schema)
+		if err != nil {
+			log.WithError(err).
+				WithField("schema", remoteEnum.Schema).
+				Error("unable to ensure schema exists")
+			return err
+		}
+		query := fmt.Sprintf(sqlCreateEnum, remoteEnum.Schema, remoteEnum.Name, strings.Join(quotedEnumStrings, ","))
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
 		if err != nil {
@@ -369,15 +371,9 @@ func ImportSchema(ctx context.Context, dbConnection *sql.DB, serverName string, 
 		}
 	}
 	// TODO: support LIMIT TO and EXCEPT
-	sb := new(strings.Builder)
-	sb.WriteString("IMPORT FOREIGN SCHEMA ")
-	sb.WriteString(schema.RemoteSchema)
-	sb.WriteString(" FROM SERVER ")
-	sb.WriteString(serverName)
-	sb.WriteString(" INTO ")
-	sb.WriteString(schema.LocalSchema)
-	log.Tracef("query: %s", sb.String())
-	_, err = dbConnection.Exec(sb.String())
+	query := fmt.Sprintf(sqlImportForeignSchema, schema.RemoteSchema, serverName, schema.LocalSchema)
+	log.Tracef("query: %s", query)
+	_, err = dbConnection.Exec(query)
 	if err != nil {
 		log.Errorf("error importing foreign schema: %s", err)
 		return err
@@ -385,26 +381,14 @@ func ImportSchema(ctx context.Context, dbConnection *sql.DB, serverName string, 
 	// If there are permissions to configure then configure them
 	for _, user := range schema.SchemaGrants.Users {
 		log.Debugf("applying grants to schema %s for user %s", schema.LocalSchema, user)
-		// GRANT USAGE ON SCHEMA xxxx TO yyyy
-		sb := new(strings.Builder)
-		sb.WriteString("GRANT USAGE ON SCHEMA ")
-		sb.WriteString(schema.LocalSchema)
-		sb.WriteString(" TO ")
-		sb.WriteString(user)
-		query := sb.String()
+		query = fmt.Sprintf(sqlGrantSchemaUsage, schema.LocalSchema, user)
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
 		if err != nil {
 			log.Errorf("error granting usage to local user: %s", err)
 			return err
 		}
-		// GRANT SELECT ON ALL TABLES IN SCHEMA xxxx TO yyyy
-		sb = new(strings.Builder)
-		sb.WriteString("GRANT SELECT ON ALL TABLES IN SCHEMA ")
-		sb.WriteString(schema.LocalSchema)
-		sb.WriteString(" TO ")
-		sb.WriteString(user)
-		query = sb.String()
+		query = fmt.Sprintf(sqlGrantTableSelect, schema.LocalSchema, user)
 		log.Tracef("query: %s", query)
 		_, err = dbConnection.Exec(query)
 		if err != nil {
